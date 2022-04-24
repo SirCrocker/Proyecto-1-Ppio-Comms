@@ -1,23 +1,45 @@
 import socket
+import sys
+import threading
 
-HOST = "127.0.0.1"
-PORT = 30000
+# Prefix for the user
+user_prefix = "ME"
+server_prefix = "Asistente"
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((HOST, PORT))
+def main():
+    HOST = "127.0.0.1"
+    PORT = 30000
 
-while True:
-    data = sock.recv(1024)
-    if data.decode() == "success":
-        break
-    print(f"[SERVER]: {data.decode()}")
-    val = input("Message: ")
-    sock.sendall(val.encode())
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((HOST, PORT))
 
+    # Function that listens from server's messages, returns in case of an error
+    def listen_to_server(sock):
 
-for i in range(5):
-    val = input("Message: ")
-    sock.sendall(val.encode())
-    data = sock.recv(1024)
-    print(f"Received: {data.decode()}")
-sock.close()
+        while True:
+            try:
+                data = sock.recv(1024).decode()
+            except OSError:
+                return
+            print(data)
+
+    # We start a thread that will listen for messages sent from the server
+    listener = threading.Thread(target=listen_to_server, args=[sock])
+    listener.start()
+
+    for user_message in sys.stdin:
+        clean_msg = user_message.rstrip()
+        print('\b\033[1A' + '\033[K', end="\r")
+        print(f"{user_prefix}: {clean_msg}")
+
+        if clean_msg != "":
+            sock.sendall(clean_msg.encode())
+
+        if clean_msg == "4":
+            break
+
+    sock.close()
+
+if __name__ == '__main__':
+    main()
+    print("Disconnected from server.")
