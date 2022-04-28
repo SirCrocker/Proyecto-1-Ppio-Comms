@@ -5,7 +5,7 @@ from custom_classes import *
 
 # Variables para hacer setup del servidor, se usa localhost y el puerto 30000
 HOST = "127.0.0.1"
-PORT = 30001
+PORT = 30000
 
 # Variables auxiliares a usar:
 # Lista con las conexiones actuales al servidor, de tipo _Conexion_
@@ -83,13 +83,15 @@ def client_loop(conn, client):
                         local_number = 1
 
                         for solicitud in client.solicitudes_activas:
-                            message = message + f'\n\t ({local_number})' + str(solicitud)
+                            message = message + f'\n\t ({local_number}) ' + str(solicitud)
                             local_number += 1
                         message += '\nAsistente: ¿Que solicitud desea consultar?'
                         conn.sendall(message.encode())
-                        chosen_order = conn.recv(1024)
+                        chosen_order = conn.recv(1024).decode()
 
-                        
+                        if chosen_order.isalnum():
+                            solicitud = client.solicitudes_activas[int(chosen_order) - 1]
+                            conn.sendall(f'Asistente: {solicitud.history[-1]}'.encode())
 
 
                 if data == "2" or intencion == 'ejecutivo':

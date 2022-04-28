@@ -9,7 +9,7 @@ def main():
     connection_ended = False
 
     HOST = "127.0.0.1"
-    PORT = 30001
+    PORT = 30000
 
     print("\n[INFO] Conectandose al servidor...")
 

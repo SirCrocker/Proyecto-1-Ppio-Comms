@@ -31,7 +31,25 @@
         "name": "Usuario de prueba (cliente)",
         "rut": "1",
         "is_executive": false,
-        "solicitudes_activas": [],
+        "solicitudes_activas": [
+            {
+                "number": 4,
+                "subject": "Active Dummy 1",
+                "open": true,
+                "history": [
+                    "Soy historia 1"
+                ]
+            },
+            {
+                "number": 5,
+                "subject": "Active Dummy 2",
+                "open": true,
+                "history": [
+                    "Soy historia 2",
+                    "Soy historia 2.1"
+                ]
+            }
+        ],
         "solicitudes_inactivas": [
             {
                 "number": 1,
@@ -47,30 +65,6 @@
             },
             {
                 "number": 3,
-                "subject": "reinicio modem",
-                "open": false,
-                "history": []
-            },
-            {
-                "number": 4,
-                "subject": "reinicio modem",
-                "open": false,
-                "history": []
-            },
-            {
-                "number": 5,
-                "subject": "reinicio modem",
-                "open": false,
-                "history": []
-            },
-            {
-                "number": 6,
-                "subject": "reinicio modem",
-                "open": false,
-                "history": []
-            },
-            {
-                "number": 7,
                 "subject": "reinicio modem",
                 "open": false,
                 "history": []
