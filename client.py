@@ -2,25 +2,32 @@ import socket
 import sys
 import threading
 
-# Prefix for the user
-user_prefix = "ME"
-server_prefix = "Asistente"
-
 def main():
+
+    # Prefix for the user
+    user_prefix = "Yo"
+    connection_ended = False
+
     HOST = "127.0.0.1"
-    PORT = 30000
+    PORT = 30001
+
+    print("\n[INFO] Conectandose al servidor...")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((HOST, PORT))
 
     # Function that listens from server's messages, returns in case of an error
-    def listen_to_server(sock):
+    def listen_to_server(s):
 
         while True:
             try:
-                data = sock.recv(1024).decode()
+                data = s.recv(1024).decode()
             except OSError:
                 return
+
+            if connection_ended or data == '':
+                return
+
             print(data)
 
     # We start a thread that will listen for messages sent from the server
@@ -31,15 +38,16 @@ def main():
         clean_msg = user_message.rstrip()
         print('\b\033[1A' + '\033[K', end="\r")
         print(f"{user_prefix}: {clean_msg}")
-
         if clean_msg != "":
             sock.sendall(clean_msg.encode())
 
-        if clean_msg == "4":
+        if clean_msg == "4" or not listener.is_alive():
+            connection_ended = True
+            print('\b\033[1A' + '\033[K', end="\r")
             break
 
     sock.close()
 
 if __name__ == '__main__':
     main()
-    print("Disconnected from server.")
+    print("[INFO] Desconectado del servidor.\n")

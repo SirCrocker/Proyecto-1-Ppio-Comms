@@ -1,155 +1,219 @@
 import socket
 import threading
 import json
+from custom_classes import *
 
-# Variables para hacer setup del servidor
+# Variables para hacer setup del servidor, se usa localhost y el puerto 30000
 HOST = "127.0.0.1"
-PORT = 30000
+PORT = 30001
 
-# Variables auxiliares a usar
-connections = [] # {getpeername(), Conexion()}
+# Variables auxiliares a usar:
+# Lista con las conexiones actuales al servidor, de tipo _Conexion_
+connections = []
+
+# Lista con los clientes existentes en la "base de datos", son de tipo _Usuario_ y aunque no es lo más
+# eficiente cumple con lo necesitado.
+clients = []
+
+# Lista con los ejecutivos existentes en la "base de datos", son de tipo _Usuario_ y aunque no es lo más
+# eficiente cumple con lo necesitado.
+execs = []
+
+# Ejecutivos disponibles
+available_execs = []
+
+# Nombre del servidor que será mostrado al usuario cuando hable con este
 server_id = "Asistente"
-users = []
-t_lock = threading.Lock()
+
+# Variable con la cual se podrán bloquear variables cuando se accederán a estas, evitando comportamientos imprevistos.
+threading_lock = threading.Lock()
 
 
-with open('data.json', 'r') as user_data:
-    database_info = json.load(user_data)
+# Función que lee el archivo .json con los usuarios y crea un objeto _Usuario_ para cada uno
+# y luego lo agrega a la lista.
+def process_users():
+    with open('users.json', 'r') as user_data:  # Abrimos y leemos el archivo
+        database_users = json.load(user_data)
 
-def process_users(users_data):
-
-    for user in users_data:
+    for user in database_users:  # Le damos el formato a solicitudes activas, inactivas y creamos y agregamos el usuario
         user['solicitudes_activas'] = list(map(lambda request: Solicitud(**request), user['solicitudes_activas']))
         user['solicitudes_inactivas'] = list(map(lambda request: Solicitud(**request), user['solicitudes_inactivas']))
-        users.append(Usuario(**user))
+        if user['is_executive']:
+            execs.append(Usuario(**user))
+        else:
+            clients.append(Usuario(**user))
+
+# Interpreta el mensaje del usuario y entrega su intención
+def interpret_user_input(user_msg):
+    return 0
+
+def exec_loop(conn, client):
+    conn.sendall(b'Eres un ejecutivo. Adios.')
 
 
-class Solicitud:
+# client_loop: loop en donde se encuentran los usuarios correspondientes a clientes
+#
+# PARAMS:
+#   conn: objeto tipo socket que caracteriza al cliente
+#   client: objeto tipo Usuario que caracteriza al usuario
+def client_loop(conn, client):
+    # Loop de ayuda/otro
+            conn.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n"
+                      f"\t (1) Revisar atenciones anteriores.\n"
+                      f"\t (2) Contactar a un ejecutivo.\n"
+                      f"\t (3) Reiniciar servicios.\n"
+                      f"\t (4) Salir\n".encode())
 
-    def __init__(self, subject, open, history, number):
-        self.subject = subject
-        self.open = open
-        self.history = history
-        self.number = number
+            while True:
+                data = conn.recv(1024)
 
-    def to_json(self):
-        final_dict = {'number' : self.number,
-                      'subject' : self.subject,
-                      'state' : self.open,
-                      'history' : self.history}
-        return final_dict
+                if not data:
+                    break
 
-class Usuario:
+                data = data.decode()
 
-    def __init__(self, name, rut, solicitudes_activas, solicitudes_inactivas, is_executive = False):
-        self.name = name # "Juan Carlos Bodoque"
-        self.rut = rut # "3.333.333-3"
-        self.is_executive = is_executive
-        self.solicitudes_activas = solicitudes_activas
-        self.solicitudes_inactivas = solicitudes_inactivas
+                intencion = interpret_user_input(data)
 
-    def to_json(self):
-        active_requests = list(map(lambda request: request.to_json(), self.solicitudes_activas))
-        inactive_requests = list(map(lambda request: request.to_json(), self.solicitudes_inactivas))
+                if data == "1" or intencion == 'historial':
+                    if len(client.solicitudes_activas) == 0:
+                        conn.sendall(b'No posee solicitudes activas.')
+                    else:
 
-        final_dict = {'name' : self.name,
-                      'rut' : self.rut,
-                      'is_executive' : self.is_executive,
-                      'solicitudes_activas' : active_requests,
-                      'solicitudes_inactivas' : inactive_requests
-                      }
+                        message = 'Asistente: Usted tiene las siguientes solicitudes en curso:'
+                        local_number = 1
 
-        return final_dict
+                        for solicitud in client.solicitudes_activas:
+                            message = message + f'\n\t ({local_number})' + str(solicitud)
+                            local_number += 1
+                        message += '\nAsistente: ¿Que solicitud desea consultar?'
+                        conn.sendall(message.encode())
+                        chosen_order = conn.recv(1024)
 
-class Conexion:
+                        
 
-    def __init__(self, user, socket_connection):
-        self.peername = socket_connection.getpeername()
-        self.user = user
-        self.socket = socket_connection
 
+                if data == "2" or intencion == 'ejecutivo':
+                    conn.sendall("Asistente: [DEBUG] EJECUTIVO".encode())
+
+                if data == "3" or intencion == 'reiniciar':
+                    conn.sendall("Asistente: Se ha reiniciado su modem.\n"
+                                 "Asistente: Como más podemos ayudarle?".encode())
+                    print(f"[INFO] Se ha reiniciado el modem del cliente {client.name}.")
+                    client.solicitudes_inactivas.append( Solicitud("reinicio modem",
+                                                                   False,
+                                                                   [],
+                                                                   len(client.solicitudes_inactivas) + 1) )
+
+                if data == "4" or intencion == 'despedida':
+                    conn.sendall("Asistente: [DEBUG] DESPEDIDA".encode())
+                    break
+
+            # Guardamos la data
+            old_user = list(filter(lambda x: x.rut == client.rut, clients))
+            if len(old_user) != 0:
+                clients.remove(old_user[0])
+                clients.append(client)
+
+# Función encargada de manejar las conexiones
 def connection_(who):
+
+    client_connection = None
+
     try:
         with who as s:
 
-            s.sendall(f'Hola! Bienvenido {s.getpeername()}, Ingrese su RUT'.encode())
+            # -------------------------------------------------------------------------------------------------------- #
+            # Bienvenida
+            s.sendall(f'Hola! Bienvenide, ingrese su RUT'.encode())
 
+            # -------------------------------------------------------------------------------------------------------- #
             # Autenticación
             while True:
                 client_RUT = s.recv(2048).decode()
 
-                if client_RUT == '4':
+                # TODO: Implementar correctamente NLP / RUT
+                intencion = interpret_user_input(client_RUT)
+
+                if client_RUT.lower() in ('4', 'chao', 'bye', 'no') or intencion == 'despedida':
                     print("Usuario no identificado se desconectó.")
                     s.close()
                     return
 
                 try:
-                    t_lock.acquire()
-                    client = list(filter(lambda x: x.rut == client_RUT, users))[0]
-                    matching_connections = list(filter(lambda x: client == x.user, connections))
-                    t_lock.release()
+                    with threading_lock:
+                        user = list(filter(lambda x: x.rut == client_RUT, clients + execs))[0]
+                        matching_connections = list(filter(lambda x: user == x.user, connections))
 
                     if len(matching_connections) != 0:
                         s.sendall(b'Asistente: Usuario ya se encuentra conectado.\n'
                                   b'Asistente: Si desea conectarse como otro usuario ingrese un nuevo rut\n'
-                                  b'Asistente: Si desea desconectarse apriete 4.')
+                                  b'Asistente: Si desea desconectarse apriete 4 o despidase.')
                     else:
-                        client_connection = Conexion(client, s)
+                        client_connection = Conexion(user, s)
 
-                        t_lock.acquire()
-                        connections.append(client_connection)
-                        t_lock.release()
+                        with threading_lock:
+                            connections.append(client_connection)
                         break
 
                 except IndexError:
-                    s.sendall(b'Asistente: RUT invalido, vuelva a ingresar su RUT')
+                    s.sendall(b'Asistente: RUT invalido, vuelva a ingresar su RUT o despidase para salir.')
+
+            # -------------------------------------------------------------------------------------------------------- #
 
             # Usuario ya se encuentra autenticado
-            print(f"{client.name} se conectó.")
+            print(f"{user.name} se conectó.")
 
-            # Loop de ayuda/otro
-            s.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n"
-                           f"\t (1) Revisar atenciones anteriores.\n"
-                           f"\t (2) Contactar a un ejecutivo.\n"
-                           f"\t (3) Reiniciar servicios.\n"
-                           f"\t (4) Salir\n".encode())
+            if user.is_executive:
+                exec_loop(s, user)  # Si es que es ejecutivo
+            else:
+                client_loop(s, user)  # Si es que es usuario
 
-            while True:
-                data = who.recv(1024)
-                if not data:
-                    break
+        print(f"{user.name} se desconectó.")
 
-                if data.decode() == '4':
-                    connections.remove(client_connection)
-                    break
+    except ConnectionResetError or BrokenPipeError as in_thread_error:
+        print(f"[WARN] {in_thread_error}")
 
-        print(f"{client.name.upper()} DISCONNECTED")
+    finally:
+        if client_connection is not None:
+            connections.remove(client_connection)
 
-    except ConnectionResetError or BrokenPipeError as error:
-        print(f"CLONTO DOSCONNOCTOD {error}")
 
+# Inicio del socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((HOST, PORT))
-sock.settimeout(0.5)
 sock.listen()
-print("Server started...")
-process_users(database_info)
-loop = True
+
+print(f"[INFO] Server started on {HOST}:{PORT}")  # Imprimos que el servidor inició
+process_users()  # Procesamos a los usuarios
 
 try:
-    while loop:
+    while True:
         try:
             conn, addr = sock.accept()
             new_t = threading.Thread(target=connection_, args=[conn])
             new_t.start()
-        except TimeoutError:
-            pass
-        except BrokenPipeError or ConnectionResetError as datos:
+        except BrokenPipeError or ConnectionResetError as datos:  # Debug
             print(f"Someone disconnected :c\n{datos}")
-        except:
-            break
 
-except:
+except Exception as error:
+    print(f"[WARN] {error}")
+
+except KeyboardInterrupt:
+    print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
+
+finally:
+
+    if len(connections) != 0:
+        for conn in connections:
+            conn.socket.close()
+
     sock.close()
 
-print("\b\bENDED")
+    with open('users.json', 'w') as file:
+        user_data = [u.to_json() for u in clients]
+        exec_data = [e.to_json() for e in execs]
+        json.dump(exec_data + user_data, file, indent=4, separators=(',', ': '))
+
+    print("[INFO] Saved user data.")
+
+    print("\b\b[INFO] Server closed.")

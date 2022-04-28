@@ -110,7 +110,7 @@ model.compile(loss="sparse_categorical_crossentropy",optimizer='adam',metrics=['
 train = model.fit(x_train,y_train,epochs=200)
 
 #Se testea el modelo
-'''''
+
 while True:
   texts_p = []
   prediction_input = input('Usuario : ')
@@ -130,7 +130,7 @@ while True:
   print("Asistente : ",random.choice(responses[response_tag]))
   if response_tag == "chao":
     break
-'''''
+
 
 servicios={"1":"Revisar atenciones anteriores.","2":"Reiniciar servicios."\
            ,"3":"Contactar a un ejecutivo","4":"Salir"}

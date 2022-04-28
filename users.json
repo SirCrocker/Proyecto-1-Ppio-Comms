@@ -1,0 +1,80 @@
+[
+    {
+        "name": "Juanin Juan Harry",
+        "rut": "4444444-4",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba (executivo)",
+        "rut": "2",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Juan Carlos Bodoque",
+        "rut": "3333333-3",
+        "is_executive": false,
+        "solicitudes_activas": [
+            {
+                "number": 1,
+                "subject": "Ayuda con Wifi de Juanin",
+                "open": true,
+                "history": "Tulio lo intento (placeholder)."
+            }
+        ],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba (cliente)",
+        "rut": "1",
+        "is_executive": false,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": [
+            {
+                "number": 1,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 2,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 3,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 4,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 5,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 6,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            },
+            {
+                "number": 7,
+                "subject": "reinicio modem",
+                "open": false,
+                "history": []
+            }
+        ]
+    }
+]
