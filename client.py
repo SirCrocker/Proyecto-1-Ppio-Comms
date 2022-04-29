@@ -37,7 +37,9 @@ def main():
     for user_message in sys.stdin:
         clean_msg = user_message.rstrip()
         print('\b\033[1A' + '\033[K', end="\r")
+
         print(f"{user_prefix}: {clean_msg}")
+
         if clean_msg != "":
             sock.sendall(clean_msg.encode())
 
@@ -50,4 +52,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    print("Asistente: gracias por contactarse con nosotros, que tenga un buen dia.")
     print("[INFO] Desconectado del servidor.\n")

@@ -19,15 +19,14 @@ clients = []
 # eficiente cumple con lo necesitado.
 execs = []
 
-# Ejecutivos disponibles
-available_execs = []
+# Lista de espera (clientes que desean conectarse con un ejecutivo)
+waiting_list = []
 
-# Nombre del servidor que será mostrado al usuario cuando hable con este
-server_id = "Asistente"
-
-# Variable con la cual se podrán bloquear variables cuando se accederán a estas, evitando comportamientos imprevistos.
+# Threading_lock permite bloquear hilos cuando se acceda a una variable, evitando comportamientos imprevistos
+# por accesos múltiples a una misma variable. Close_thread genera un evento con el que los hilos pueden revisar si deben
+# cerrarse.
 threading_lock = threading.Lock()
-
+close_thread = threading.Event()
 
 # Función que lee el archivo .json con los usuarios y crea un objeto _Usuario_ para cada uno
 # y luego lo agrega a la lista.
@@ -43,83 +42,151 @@ def process_users():
         else:
             clients.append(Usuario(**user))
 
+
 # Interpreta el mensaje del usuario y entrega su intención
 def interpret_user_input(user_msg):
     return 0
 
-def exec_loop(conn, client):
-    conn.sendall(b'Eres un ejecutivo. Adios.')
 
+def exec_loop(exec_connection : Conexion):
+    exec_connection.socket.sendall(b'Eres un ejecutivo.')
+
+    while True:
+        with threading_lock:
+            if len(waiting_list) != 0:
+                the_client = waiting_list.pop(0)
+                the_client.exec_info = exec_connection
+                break
+
+    while True:
+        data2 = exec_connection.socket.recv(1024)
+
+        if data2.decode() == '-':
+            break
+
+        the_client.socket.sendall(data2)
 
 # client_loop: loop en donde se encuentran los usuarios correspondientes a clientes
 #
 # PARAMS:
 #   conn: objeto tipo socket que caracteriza al cliente
 #   client: objeto tipo Usuario que caracteriza al usuario
-def client_loop(conn, client):
+def client_loop(client_connection : Conexion):
+    client = client_connection.user
+    conn = client_connection.socket
+
+    assistant_options = f"\t (1) Revisar atenciones anteriores.\n" \
+                        f"\t (2) Contactar a un ejecutivo.\n" \
+                        f"\t (3) Reiniciar servicios.\n" \
+                        f"\t (4) Salir\n"
+
     # Loop de ayuda/otro
-            conn.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n"
-                      f"\t (1) Revisar atenciones anteriores.\n"
-                      f"\t (2) Contactar a un ejecutivo.\n"
-                      f"\t (3) Reiniciar servicios.\n"
-                      f"\t (4) Salir\n".encode())
+    conn.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n{assistant_options}".encode())
+
+    while True:
+        if close_thread.is_set():
+            break
+
+        data = conn.recv(1024)
+
+        if close_thread.is_set():
+            break
+
+        if not data:
+            continue
+
+        data = data.decode()
+
+        intencion = interpret_user_input(data)
+
+        # ------------------------------------------------------------------------------------------------------------ #
+        # Opción historial
+        # Descripción:
+        if data == "1" or intencion == 'historial':
+            if len(client.solicitudes_activas) == 0:
+                conn.sendall(b'No posee solicitudes activas.')
+            else:
+
+                message = 'Asistente: Usted tiene las siguientes solicitudes en curso:'
+                local_number = 1
+
+                for solicitud in client.solicitudes_activas:
+                    message = message + f'\n\t ({local_number}) ' + str(solicitud)
+                    local_number += 1
+
+                message += '\nAsistente: ¿Que solicitud desea consultar?'
+                conn.sendall(message.encode())
+                chosen_order = conn.recv(1024).decode()
+
+                if chosen_order.isalnum() and int(chosen_order) > 0 \
+                        and int(chosen_order) <= len(client.solicitudes_activas):
+
+                    solicitud = client.solicitudes_activas[int(chosen_order) - 1]
+                    conn.sendall(f'Asistente: {solicitud.history[-1]}\n'.encode())
+                else:
+                    conn.sendall(f'Asistente: usted no seleccionó una solicitud valida.\n'.encode())
+
+        # ------------------------------------------------------------------------------------------------------------ #
+        # Opción ejecutivo
+        # Descripción:
+        if data == "2" or intencion == 'ejecutivo':
+            with threading_lock:
+                waiting_list.append(client_connection)
+                queue_number = len(waiting_list)
+
+            conn.sendall(f'Asistente: Usted se encuentra número {queue_number} en la fila, por favor espere'.encode())
 
             while True:
-                data = conn.recv(1024)
+                with threading_lock:  # TODO: revisar si tira problemas lockear aquí
+                    if client_connection.exec_info is not None:
+                        break
 
-                if not data:
+            executive = client_connection.exec_info.user
+            exec_conn = client_connection.exec_info.socket
+            conn.sendall(f"{executive.name}: Hola soy {executive.name}, ¿en qué le puedo ayudar?".encode())
+            print(f"[INFO] Cliente {client.name} ha sido redirigido a {executive.name}.")
+
+            while True:
+                data2 = conn.recv(1024)
+
+                if data2.decode() == '-':
                     break
 
-                data = data.decode()
+                # TODO: checkear conexiones existentes, y que la desconexión de uno implique la del otro y lo que pide
+                # el enunciado.
 
-                intencion = interpret_user_input(data)
-
-                if data == "1" or intencion == 'historial':
-                    if len(client.solicitudes_activas) == 0:
-                        conn.sendall(b'No posee solicitudes activas.')
-                    else:
-
-                        message = 'Asistente: Usted tiene las siguientes solicitudes en curso:'
-                        local_number = 1
-
-                        for solicitud in client.solicitudes_activas:
-                            message = message + f'\n\t ({local_number}) ' + str(solicitud)
-                            local_number += 1
-                        message += '\nAsistente: ¿Que solicitud desea consultar?'
-                        conn.sendall(message.encode())
-                        chosen_order = conn.recv(1024).decode()
-
-                        if chosen_order.isalnum():
-                            solicitud = client.solicitudes_activas[int(chosen_order) - 1]
-                            conn.sendall(f'Asistente: {solicitud.history[-1]}'.encode())
+                exec_conn.sendall(data2)
 
 
-                if data == "2" or intencion == 'ejecutivo':
-                    conn.sendall("Asistente: [DEBUG] EJECUTIVO".encode())
 
-                if data == "3" or intencion == 'reiniciar':
-                    conn.sendall("Asistente: Se ha reiniciado su modem.\n"
-                                 "Asistente: Como más podemos ayudarle?".encode())
-                    print(f"[INFO] Se ha reiniciado el modem del cliente {client.name}.")
-                    client.solicitudes_inactivas.append( Solicitud("reinicio modem",
-                                                                   False,
-                                                                   [],
-                                                                   len(client.solicitudes_inactivas) + 1) )
+        # ------------------------------------------------------------------------------------------------------------ #
+        # Opción reiniciar servicios
+        # Descripción:
+        if data == "3" or intencion == 'reiniciar_servicios':
+            conn.sendall("Asistente: Se ha reiniciado su modem.".encode())
+            print(f"[INFO] Se ha reiniciado el modem del cliente {client.name}.")
 
-                if data == "4" or intencion == 'despedida':
-                    conn.sendall("Asistente: [DEBUG] DESPEDIDA".encode())
-                    break
+        # ------------------------------------------------------------------------------------------------------------ #
+        # Opción despedida
+        # Descripción:
+        if data == "4" or intencion == 'despedida':
+            break
 
-            # Guardamos la data
-            old_user = list(filter(lambda x: x.rut == client.rut, clients))
-            if len(old_user) != 0:
-                clients.remove(old_user[0])
-                clients.append(client)
+        # Cada vez que se termina una acción solicitada por el usuario el servidor envía el mensaje de las opciones
+        # disponibles.
+        conn.sendall(f"\nAsistente: ¿De qué otra manera podemos ayudarle?\n{assistant_options}".encode())
+
+    # Fin del loop donde se encuentra el usuario, guardamos su información, donde se pudo haber cambiado el estado,
+    # o agregado una solicitud
+    old_user = list(filter(lambda x: x.rut == client.rut, clients))
+    if len(old_user) != 0:
+        clients.remove(old_user[0])
+        clients.append(client)
+
 
 # Función encargada de manejar las conexiones
 def connection_(who):
-
-    client_connection = None
+    user_connection = None
 
     try:
         with who as s:
@@ -151,10 +218,10 @@ def connection_(who):
                                   b'Asistente: Si desea conectarse como otro usuario ingrese un nuevo rut\n'
                                   b'Asistente: Si desea desconectarse apriete 4 o despidase.')
                     else:
-                        client_connection = Conexion(user, s)
+                        user_connection = Conexion(user, s)
 
                         with threading_lock:
-                            connections.append(client_connection)
+                            connections.append(user_connection)
                         break
 
                 except IndexError:
@@ -166,9 +233,9 @@ def connection_(who):
             print(f"{user.name} se conectó.")
 
             if user.is_executive:
-                exec_loop(s, user)  # Si es que es ejecutivo
+                exec_loop(user_connection)  # Si es que es ejecutivo
             else:
-                client_loop(s, user)  # Si es que es usuario
+                client_loop(user_connection)  # Si es que es usuario
 
         print(f"{user.name} se desconectó.")
 
@@ -176,8 +243,8 @@ def connection_(who):
         print(f"[WARN] {in_thread_error}")
 
     finally:
-        if client_connection is not None:
-            connections.remove(client_connection)
+        if user_connection is not None:
+            connections.remove(user_connection)
 
 
 # Inicio del socket
@@ -202,12 +269,16 @@ except Exception as error:
 
 except KeyboardInterrupt:
     print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
-
-finally:
+    close_thread.set()
 
     if len(connections) != 0:
-        for conn in connections:
-            conn.socket.close()
+        print("[INFO] Closing active connections to the server...")
+
+    while True:
+        if len(connections) == 0:
+            break
+
+finally:
 
     sock.close()
 

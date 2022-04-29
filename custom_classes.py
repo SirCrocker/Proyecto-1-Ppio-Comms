@@ -65,12 +65,12 @@ class Usuario:
 class Conexion:
 
     """
-    Maneja las conexiones existentes, teniendo tres atributos, _peername_ que posee la ip y puerto de quien se conecta,
-    _user_ que es el usuario conectado con esa ip y puerto, y _socket_ que es la instancia de socket que posee toda la
-    información correspondiente al socket de ese usuario en específico.
+    Maneja las conexiones existentes, teniendo tres atributos, _exec_conn_ que posee la conexion de un ejecutivo si es
+    que el usuario es cliente, _user_ que es el usuario conectado con esa ip y puerto, y _socket_ que es la instancia
+    de socket que posee toda la información correspondiente al socket de ese usuario en específico.
     """
 
-    def __init__(self, user, socket_connection):
-        self.peername = socket_connection.getpeername()
+    def __init__(self, user, socket_connection, exec_connection = None):
+        self.exec_info = exec_connection
         self.user = user
         self.socket = socket_connection
