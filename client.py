@@ -9,7 +9,7 @@ def main():
     connection_ended = False
 
     HOST = "127.0.0.1"
-    PORT = 30000
+    PORT = 30001
 
     print("\n[INFO] Conectandose al servidor...")
 
@@ -52,5 +52,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    print("Asistente: gracias por contactarse con nosotros, que tenga un buen dia.")
+    print("Asistente: Gracias por contactarse con nosotros, que tenga un buen dia.")
     print("[INFO] Desconectado del servidor.\n")
