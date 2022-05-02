@@ -28,7 +28,7 @@ def main():
             if connection_ended or data == '':
                 return
 
-            print(data)
+            print(data.replace('\nAsistente:', 'Asistente:').replace('Asistente:', '\nAsistente:'))
 
     # We start a thread that will listen for messages sent from the server
     listener = threading.Thread(target=listen_to_server, args=[sock])
@@ -37,6 +37,9 @@ def main():
     for user_message in sys.stdin:
         clean_msg = user_message.rstrip()
         print('\b\033[1A' + '\033[K', end="\r")
+
+        if clean_msg == '':
+            continue
 
         print(f"{user_prefix}: {clean_msg}")
 

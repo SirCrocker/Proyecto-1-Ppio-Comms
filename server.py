@@ -79,14 +79,14 @@ def exec_loop(exec_connection: Conexion):
                '\t:history <new history> (agrega historia a la solicitud del cliente conectado)*\n' \
                '\t:restart (reinicia los servicios del cliente)*\n' \
                '\t:help (imprime la lista de comandos)\n' \
-               '* Es necesario estar conectade con un cliente.'
+               '* Es necesario estar conectade con un cliente.\n'
 
     # Se envía una bienvenida al ejecutivo para señalar que se realizó la autenticación correctamente
     exec_socket.sendall(f'Asistente: Bienvenide {executive.name} los comandos disponibles son:\n{commands}'.encode())
 
     # Se inicia loop donde se encontrará el ejecutivo
     while True:
-        working_request = None  # Variable donde se guarda la solicitud con la cuál se trabajará
+        working_request = None  # Variable donde se guarda la solicitud con la cual se trabajará
 
         # Se revisa si hay clientes esperando ser atendidos
         with threading_lock:
@@ -367,49 +367,54 @@ def exec_loop(exec_connection: Conexion):
                     except OSError:
                         break
 
-# TODO: Comentado de aquí para abajo
 # FUNC: client_loop
 # DESC: loop en donde se encuentran los usuarios que corresponden a clientes. Implementa todas la funciones,
 #       comandos y lógicas realizables.
 # PARAMS:
 #   client_connection: objeto conexión con el usuario y socket del cliente
 def client_loop(client_connection: Conexion):
+    # Definimos el socket y usario del cliente
     client = client_connection.user
     client_socket = client_connection.socket
 
+    # Opciones para los clientes
     assistant_options = f"\t (1) Revisar atenciones anteriores.\n" \
                         f"\t (2) Contactar a un ejecutivo.\n" \
                         f"\t (3) Reiniciar servicios.\n" \
                         f"\t (4) Salir\n"
 
-    # Loop de ayuda/otro
+    # Bienvenida al cliente
     client_socket.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n{assistant_options}".encode())
 
-    # TODO: clean up this
+    # Loop del cliente
     while True:
+        # Se revisa si la señal de cerrar los hilos se activó
         if close_thread.is_set():
             break
 
-        data = client_socket.recv(1024)
+        data = client_socket.recv(1024).decode()  # Recibir la información del cliente
 
+        # Se revisa nuevamente si la señal de cerrar los hilos se activó
         if close_thread.is_set():
             break
 
+        # En caso de que no llegué información del cliente se reinicia el loop
         if not data:
             continue
 
-        data = data.decode()
+        intencion = interpret_user_input(data)  # Interpretación del mensaje del cliente por NLP
 
-        intencion = interpret_user_input(data)
-
+        # Inicio de interpretación de la información recibida del cliente
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción historial
-        # Descripción:
+        # Descripción: Permite escoger una solicitud activa y muestra la última entrada que tiene en su historia
         if data == "1" or intencion == 'historial':
+            # Checkeo de que tenga solicitudes activas
             if len(client.solicitudes_activas) == 0:
                 client_socket.sendall(b'No posee solicitudes activas.')
+            # De tener solicitudes activas se sigue este camino
             else:
-
+                # Se crea el mensaje a enviar con las solicitudes
                 message = 'Asistente: Usted tiene las siguientes solicitudes en curso:'
                 local_number = 1
 
@@ -418,71 +423,82 @@ def client_loop(client_connection: Conexion):
                     local_number += 1
 
                 message += '\nAsistente: ¿Que solicitud desea consultar?'
-                client_socket.sendall(message.encode())
-                chosen_order = client_socket.recv(1024).decode()
+                client_socket.sendall(message.encode())  # Se envía el mensaje
+                chosen_order = client_socket.recv(1024).decode()  # Se recibe la orden escogida
 
+                # Se verifica que la respuesta sea un número válido
                 if chosen_order.isalnum() and 0 < int(chosen_order) <= len(client.solicitudes_activas):
-
                     solicitud = client.solicitudes_activas[int(chosen_order) - 1]
                     client_socket.sendall(f'Asistente: {solicitud.history[-1]}\n'.encode())
+                # En caso de que no sea válido el número se avisa
                 else:
                     client_socket.sendall(f'Asistente: usted no seleccionó una solicitud valida.\n'.encode())
 
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción ejecutivo
-        # Descripción:
+        # Descripción: Se agrega al cliente a una lista de espera para luego ser conectado a un ejecutivo, se mantiene
+        #              al cliente en espera de un ejecutivo.
         if data == "2" or intencion == 'ejecutivo':
+            # Se agrega al cliente a la lista de espera
             with threading_lock:
                 waiting_list.append(client_connection)
                 queue_number = len(waiting_list)
 
+            # Se avisa que número en la fila tiene el cliente
             client_socket.sendall(f'Asistente: Usted se encuentra número {queue_number} en la fila, '
-                                  f'por favor espere'.encode())
+                                  f'por favor espere...'.encode())
 
+            # Se revisa si es que ya se asignó un ejecutivo al cliente, se mantiene al cliente en un loop
             while True:
                 with threading_lock:
                     if client_connection.exec_info is not None:
                         break
 
+            # El ejecutivo ya se conectó y se identifica su socket y usuario
             executive = client_connection.exec_info.user
             exec_socket = client_connection.exec_info.socket
+            # Se avisa de la conexión e imprime de la redirección en la consola del servidor
             client_socket.sendall(f"\n{executive.name}: Hola {client.name}, ¿en qué le puedo ayudar?".encode())
             print(f"[SERVER] Cliente {client.name} ha sido redirigido a {executive.name}.")
 
+            # Loop de comunicación entre cliente y ejecutivo,
+            # el cliente no posee comandos, solo envía mensajes a ejecutivo
             while True:
                 try:
-                    data_received = client_socket.recv(1024).decode()
-                    data_to_send = (client.name + ': ' + data_received).encode()
+                    data_received = client_socket.recv(1024).decode()  # Información recibida
+                    data_to_send = (client.name + ': ' + data_received).encode()  # Información limpiada para enviar
 
+                    # Se revisa si se activó la bandera para cerrar conexión cliente-ejecutivo
                     if data_received == '' or client_connection.reset_connection:
                         del exec_socket
                         client_connection.exec_info = None
                         client_connection.reset_connection = False
                         break
 
-                    exec_socket.sendall(data_to_send)
+                    exec_socket.sendall(data_to_send)  # Envío de información
 
                 except OSError:
                     break
 
+            # Se informa del cierre de conexión
             client_socket.sendall(f"Asistente: se ha cerrado su conexion con {executive.name}.".encode())
 
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción reiniciar servicios
-        # Descripción:
+        # Descripción: Comando 'dummy' que avisa del reinicio del modem al usuario y en la consola del servidor
         if data == "3" or intencion == 'reiniciar_servicios':
-            client_socket.sendall("Asistente: Se ha reiniciado su modem.".encode())
+            client_socket.sendall("Asistente: Se ha reiniciado su modem.\n".encode())
             print(f"[INFO] Se ha reiniciado el modem del cliente {client.name}.")
 
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción despedida
-        # Descripción:
+        # Descripción: Cierra la conexión del cliente con el servidor
         if data == "4" or intencion == 'despedida':
             break
 
         # Cada vez que se termina una acción solicitada por el usuario el servidor envía el mensaje de las opciones
         # disponibles.
-        client_socket.sendall(f"\nAsistente: ¿De qué otra manera podemos ayudarle?\n{assistant_options}".encode())
+        client_socket.sendall(f"Asistente: ¿De qué otra manera podemos ayudarle?\n{assistant_options}".encode())
 
 
 # FUNC: _connection_manager
@@ -560,49 +576,48 @@ def _connection_manager(a_socket):
         if user_connection is not None:
             connections.remove(user_connection)
 
-# TODO: limpiar esta parte
-# IF NAME == MAIN
-# Inicio del socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.bind((HOST, PORT))
-sock.listen()
+if __name__ == '__main__':
+    # Inicio del socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind((HOST, PORT))
+    sock.listen()
 
-print(f"[INFO] Server started on {HOST}:{PORT}")  # Imprimos que el servidor inició
-# Procesamos a los usuarios y asignamos a requests_number el número total de solicitudes existentes
-requests_number = process_users()
+    print(f"[INFO] Server started on {HOST}:{PORT}")  # Imprimos que el servidor inició
+    # Procesamos a los usuarios y asignamos a requests_number el número total de solicitudes existentes
+    requests_number = process_users()
 
-try:
-    while True:
-        try:
-            conn, addr = sock.accept()
-            new_t = threading.Thread(target=_connection_manager, args=[conn])
-            new_t.start()
-        except BrokenPipeError or ConnectionResetError as datos:  # Debug
-            print(f"[WARN] Someone disconnected\n{datos}")
+    try:
+        while True:
+            try:
+                conn, addr = sock.accept()
+                new_t = threading.Thread(target=_connection_manager, args=[conn])
+                new_t.start()
+            except BrokenPipeError or ConnectionResetError as datos:  # Debug
+                print(f"[WARN] Someone disconnected\n{datos}")
 
-except KeyboardInterrupt:
-    print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
-    close_thread.set()
+    except KeyboardInterrupt:
+        print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
+        close_thread.set()
 
-    if len(connections) != 0:
-        print("[INFO] Closing active connections to the server...")
+        if len(connections) != 0:
+            print("[INFO] Closing active connections to the server...")
 
-    while True:
-        if len(connections) == 0:
-            break
+        while True:
+            if len(connections) == 0:
+                break
 
-except Exception as error:
-    print(f"[WARN:] {error}")
+    except Exception as error:
+        print(f"[WARN:] {error}")
 
-finally:
+    finally:
 
-    sock.close()
+        sock.close()
 
-    with open('users.json', 'w') as file:
-        user_data = [u.to_json() for u in clients]
-        exec_data = [e.to_json() for e in execs]
-        json.dump(exec_data + user_data, file, indent=4, separators=(',', ': '))
+        with open('users.json', 'w') as file:
+            user_data = [u.to_json() for u in clients]
+            exec_data = [e.to_json() for e in execs]
+            json.dump(exec_data + user_data, file, indent=4, separators=(',', ': '))
 
-    print("[INFO] Saved user data.")
+        print("[INFO] Saved user data.")
 
-    print("\b\b[INFO] Server closed.")
+        print("\b\b[INFO] Server closed.")
