@@ -7,8 +7,36 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Test User (exec)",
+        "name": "Usuario de prueba 1 (ejecutivo)",
         "rut": "2",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba 2 (ejecutivo)",
+        "rut": "0",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba 3 (ejecutivo)",
+        "rut": "6",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba 4 (ejecutivo)",
+        "rut": "8",
+        "is_executive": true,
+        "solicitudes_activas": [],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Usuario de prueba 5 (ejecutivo)",
+        "rut": "10",
         "is_executive": true,
         "solicitudes_activas": [],
         "solicitudes_inactivas": []
@@ -39,13 +67,61 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Usuario de prueba (cliente)",
+        "name": "Cliente 3 (UdP)",
+        "rut": "5",
+        "is_executive": false,
+        "solicitudes_activas": [
+            {
+                "number": 1,
+                "subject": "Ayuda con Wifi, anda malo",
+                "open": true,
+                "history": [
+                    "Tecnico enviado a revisar la situacion"
+                ]
+            },
+            {
+                "number": 9,
+                "subject": "Recuperaci\u00f3n de contrase\u00f1a",
+                "open": true,
+                "history": [
+                    "Creaci\u00f3n de la solicitud por Juanin Juan Harry"
+                ]
+            }
+        ],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Cliente 2 (UdP)",
+        "rut": "3",
+        "is_executive": false,
+        "solicitudes_activas": [
+            {
+                "number": 1,
+                "subject": "Ayuda con Wifi, anda malo",
+                "open": true,
+                "history": [
+                    "Tecnico enviado a revisar la situacion"
+                ]
+            },
+            {
+                "number": 9,
+                "subject": "Recuperaci\u00f3n de contrase\u00f1a",
+                "open": true,
+                "history": [
+                    "Creaci\u00f3n de la solicitud por Juanin Juan Harry"
+                ]
+            }
+        ],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Cliente 1 (UdP)",
         "rut": "1",
         "is_executive": false,
         "solicitudes_activas": [
             {
                 "number": 4,
-                "subject": "Active Dummy 1",
+                "subject": "Ayuda con WiFi",
                 "open": true,
                 "history": [
                     "Soy historia 1"
@@ -97,5 +173,54 @@
                 "history": []
             }
         ]
+    },
+    {
+        "name": "Cliente 4 (UdP)",
+        "rut": "7",
+        "is_executive": false,
+        "solicitudes_activas": [
+            {
+                "number": 1,
+                "subject": "Ayuda con Wifi, anda malo",
+                "open": true,
+                "history": [
+                    "Tecnico enviado a revisar la situacion"
+                ]
+            },
+            {
+                "number": 9,
+                "subject": "Recuperaci\u00f3n de contrase\u00f1a",
+                "open": true,
+                "history": [
+                    "Creaci\u00f3n de la solicitud por Juanin Juan Harry"
+                ]
+            }
+        ],
+        "solicitudes_inactivas": []
+    },
+    {
+        "name": "Cliente 4 (UdP)",
+        "rut": "9",
+        "is_executive": false,
+        "solicitudes_activas": [
+            {
+                "number": 1,
+                "subject": "Ayuda con Wifi, anda malo",
+                "open": true,
+                "history": [
+                    "Tecnico enviado a revisar la situacion"
+                ]
+            },
+            {
+                "number": 9,
+                "subject": "Recuperaci\u00f3n de contrase\u00f1a",
+                "open": true,
+                "history": [
+                    "Creaci\u00f3n de la solicitud por Juanin Juan Harry",
+                    "Infruct\u00edfera b\u00fasqueda de contrase\u00f1a en base de datos"
+                ]
+            }
+        ],
+        "solicitudes_inactivas": []
     }
 ]
