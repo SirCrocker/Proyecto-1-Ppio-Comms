@@ -277,6 +277,11 @@ def exec_loop(exec_connection: Conexion):
                         elif data_received[0:len(':help')] == ':help':
                             exec_socket.sendall(f"Asistente: Los comandos disponibles son:\n{commands}".encode())
 
+                        # -------------------------------------------------------------------------------------------- #
+                        # Opción :help, imprime los comandos disponibles
+                        elif data_received[0:len(':help')] == ':help' or data_received[0:len(':name')] == ':name':
+                            exec_socket.sendall("Asistente: Comando no disponible al hablar con cliente.".encode())
+
                         else:
                             data_to_send = (executive.name + ': ' + data_received).encode()
                             client_socket.sendall(data_to_send)
