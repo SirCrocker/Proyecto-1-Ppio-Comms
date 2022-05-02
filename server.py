@@ -30,7 +30,8 @@ close_thread = threading.Event()
 
 
 # Función que lee el archivo .json con los usuarios y crea un objeto _Usuario_ para cada uno
-# y luego lo agrega a la lista. También devuelve la cantidad existente de solicitudes, ya sea activa o inactivas.
+# y luego lo agrega a la lista de usuarios. También devuelve la cantidad existente de solicitudes,
+# ya sean activas o inactivas.
 def process_users():
     number_of_requests = 0
     with open('users.json', 'r') as users_in_database:  # Abrimos y leemos el archivo
@@ -40,87 +41,115 @@ def process_users():
         user['solicitudes_activas'] = list(map(lambda request: Solicitud(**request), user['solicitudes_activas']))
         user['solicitudes_inactivas'] = list(map(lambda request: Solicitud(**request), user['solicitudes_inactivas']))
         number_of_requests += len(user['solicitudes_activas']) + len(user['solicitudes_inactivas'])
-        if user['is_executive']:
+
+        if user['is_executive']:  # Si el usuario es ejecutivo se agrega a 'execs', si no, a 'clients'
             execs.append(Usuario(**user))
         else:
             clients.append(Usuario(**user))
 
-    return number_of_requests
+    return number_of_requests  # Se devuelve la cantidad de solicitudes existentes
 
 
-# Interpreta el mensaje del usuario y entrega su intención
+# Interpreta el mensaje del usuario y entrega su intención (uso de NLP)
 def interpret_user_input(user_msg):
     return 0
 
 
+# FUNC: exec_loop
+# DESC: loop en donde se encuentran los usuarios que corresponden a ejecutives. Implementa todas la funciones,
+#       comandos y lógicas realizables.
+# PARAMS:
+#   exec_connection: objeto conexión con el usuario y socket del ejecutivo
 def exec_loop(exec_connection: Conexion):
     global requests_number
 
+    # Identificamos el socket del ejecutivo y su usuario
     exec_socket = exec_connection.socket
     executive = exec_connection.user
 
+    # Comandos disponibles para el ejecutivo
     commands = '\t:name <nombre> (cambia su nombre)\n' \
                '\t:exit (termina conexión con el servidor)\n' \
                '\t:connect (conecta al ejecutivo a un cliente en la lista de espera)\n' \
-               '\t:close (cierra la conexión con el cliente)\n' \
-               '\t:new (crea una nueva solicitud, debe estarse conectado con un usuario)\n' \
-               '\t:requests (imprime las solicitudes activas del cliente conectado, pudiendo escoger una)\n' \
-               '\t:subject <new subject> (cambia el sujeto de una solicitud del cliente conectado)\n' \
-               '\t:state [abierto|cerrado] (cambia el estado de una solicitud del cliente conectado)\n' \
-               '\t:history <new history> (agrega historia a la solicitud del cliente conectado)\n' \
-               '\t:restart (reinicia los servicios del cliente)\n' \
-               '\t:help (imprime la lista de comandos)'
+               '\t:close (cierra la conexión con el cliente)*\n' \
+               '\t:new (crea una nueva solicitud, debe estarse conectado con un usuario)*\n' \
+               '\t:requests (imprime las solicitudes activas del cliente conectado, pudiendo escoger una)*\n' \
+               '\t:subject <new subject> (cambia el sujeto de una solicitud del cliente conectado)*\n' \
+               '\t:state [abierto|cerrado] (cambia el estado de una solicitud del cliente conectado)*\n' \
+               '\t:history <new history> (agrega historia a la solicitud del cliente conectado)*\n' \
+               '\t:restart (reinicia los servicios del cliente)*\n' \
+               '\t:help (imprime la lista de comandos)\n' \
+               '* Es necesario estar conectade con un cliente.'
 
+    # Se envía una bienvenida al ejecutivo para señalar que se realizó la autenticación correctamente
     exec_socket.sendall(f'Asistente: Bienvenide {executive.name} los comandos disponibles son:\n{commands}'.encode())
 
+    # Se inicia loop donde se encontrará el ejecutivo
     while True:
-        working_request = None
+        working_request = None  # Variable donde se guarda la solicitud con la cuál se trabajará
 
+        # Se revisa si hay clientes esperando ser atendidos
         with threading_lock:
             if len(waiting_list) != 0:
                 exec_socket.sendall(f"Asistente: Hay {len(waiting_list)} clientes en la lista de espera. "
                                     f"Envíe :connect para conectarse con el primero en la fila.".encode())
 
+        # Se recibe información del ejecutivo y se decodifica.
+        # Si es un comando, se ejecuta, si no, se reenvía al usuario
         data = exec_socket.recv(1024).decode()
 
-        # -------------------------------------------------------------------------------------------- #
-        # Opción :name, cambia el nombre del ejecutivo al cual desee
+        # ------------------------------------------------------------------------------------------------------------ #
+        # Opción :name, cambia el nombre del ejecutivo al cual se desee
         if data[0:len(':name')] == ':name':
-            old_name = executive.name
-            executive.name = data.lstrip(':name').lstrip()
-            exec_socket.sendall(f"Asistente: Su nombre fue cambiado a {executive.name}".encode())
-            print(f"[INFO] Ejecutive {old_name} cambió su nombre a {executive.name}")
+            old_name = executive.name  # Nombre antiguo
+            executive.name = data.lstrip(':name').lstrip()  # Se rescata el nuevo nombre
+            exec_socket.sendall(f"Asistente: Su nombre fue cambiado a {executive.name}".encode())  # Aviso del cambio
+            print(f"[INFO] Ejecutive {old_name} cambió su nombre a {executive.name}")  # Se imprime que hubo un cambio
 
-        # -------------------------------------------------------------------------------------------- #
+        # ------------------------------------------------------------------------------------------------------------ #
         # Opción :exit, cierra la conexión del ejecutivo con el servidor
-        elif data[0:len(':exit')] == ':exit' or data == '4':
-            exec_socket.sendall("Asistente: Desconectandole del servidor".encode())
+        elif data[0:len(':exit')] == ':exit' or data == '4':  # Se mantiene el 4 al estar hard-coded en cliente.py
+            exec_socket.sendall("Asistente: Desconectandole del servidor".encode())  # Se avisa de la desconexión
             break
 
-        # -------------------------------------------------------------------------------------------- #
+        # ------------------------------------------------------------------------------------------------------------ #
         # Opción :help, imprime los comandos disponibles
         elif data[0:len(':help')] == ':help':
             exec_socket.sendall(f"Asistente: Los comandos disponibles son:\n{commands}".encode())
 
-        # -------------------------------------------------------------------------------------------- #
+        # ------------------------------------------------------------------------------------------------------------ #
         # Opción :connect, conecta al ejecutivo con un cliente, de haber clientes en la fila de espera
         elif data[0:len(':connect')] == ':connect':
+
+            # Se revisa si hay clientes en la lista de espera, de haber se conecta, si no se dice que no hay
             with threading_lock:
                 clients_waiting = len(waiting_list)
+
             if clients_waiting == 0:
                 exec_socket.sendall('Asistente: No hay clientes esperando hablar con un ejecutive'.encode())
             else:
+
+                # Se recupera el cliente que lleva más tiempo en la lista de espera
                 with threading_lock:
                     client_connection = waiting_list.pop(0)
+
+                # Se asigna un ejecutivo a ese cliente
                 client_connection.exec_info = exec_connection
+                # Se identifican el socket y usuario del cliente
                 client = client_connection.user
                 client_socket = client_connection.socket
+                # Se avisa de la conexión
                 exec_socket.sendall(f'Asistente: Conectandole con {client.name}...'
                                     f'\nYo: Hola soy {executive.name}, ¿en qué le puedo ayudar?'.encode())
 
+                # Loop en que se encuentra el ejecutivo cuando está conectado con un cliente.
+                # Activa/desactiva ciertos comandos.
                 while True:
+
+                    # Para manejo de posibles errores que pueden aparecer
                     try:
 
+                        # Se recibe información del ejecutivo
                         data_received = exec_socket.recv(1024).decode()
 
                         # -------------------------------------------------------------------------------------------- #
@@ -128,54 +157,80 @@ def exec_loop(exec_connection: Conexion):
                         if data_received == '' or data_received[0:len(':close')] == ':close':
                             client_socket.sendall("Asistente: Ejecutive se ha desconectado.".encode())
                             exec_socket.sendall("Asistente: Conexion con el cliente terminada".encode())
+                            # Bandera que avisa al cliente del cierre de conexión entre ejecutivo y cliente
                             client_connection.reset_connection = True
                             break
 
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :requests, revisa las solicitudes activas de un cliente
                         elif data_received[0:len(':requests')] == ':requests':
+                            # Mensaje a enviar
                             message = 'Asistente: El cliente tiene las siguientes solicitudes activas:'
-                            local_number = 1
+                            local_number = 1  # Número de solicitudes activas del cliente
 
+                            # Se agrega por cada solicitud activa una entrada al mensaje
                             for request in client.solicitudes_activas:
                                 message = message + f'\n\t ({local_number}) ' + str(request)
                                 local_number += 1
 
-                            message += '\nAsistente: ¿Que solicitud desea escoger?'
-                            exec_socket.sendall(message.encode())
-                            chosen_order = exec_socket.recv(1024).decode()
+                            # De no tener solicitudes activas, se imprime
+                            if local_number == 1:
+                                exec_socket.sendall(
+                                    'Asistente: Acción cancelada, el cliente no tiene solicitudes activas.'.encode())
+                                continue  # Se pasa a la siguiente iteración del loop
 
+                            # Se agrega la última información al mensaje
+                            message += '\nAsistente: ¿Que solicitud desea escoger?'
+                            exec_socket.sendall(message.encode())  # Se envía el mensaje
+                            chosen_order = exec_socket.recv(1024).decode()  # Se recibe la orden escogida
+
+                            # Camino a seguir si se escoge una orden válida
                             if chosen_order.isalnum() and 0 < int(chosen_order) <= len(client.solicitudes_activas):
                                 working_request = client.solicitudes_activas[int(chosen_order) - 1]
                                 exec_socket.sendall(f"Asistente: "
                                                     f"solicitud {working_request.number} seleccionada.".encode())
+
+                            # Camino a seguir si la orden escogida no es válida
                             else:
                                 exec_socket.sendall(b"Asistente: No se ha seleccionado una solicitud del cliente.")
+
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :new, crea una nueva solicitud para el cliente actual
                         elif data_received[0:len(':new')] == ':new':
+
+                            # Mensaje que simboliza que se seleccionó la opción, junto a información de uso
                             exec_socket.sendall(f"Asistente: Se va a crear una nueva solicitud para {client.name},"
                                                 f" por favor envíe la descripción. "
                                                 f"(Para cancelar envie ':cancel' )".encode())
+
+                            # Se recibe la descripción que tendrá la solicitud
                             subject = exec_socket.recv(1024).decode()
 
+                            # Se revisa si se decidió cancelar la acción
                             if subject[0:len(':cancel')] == ':cancel':
                                 exec_socket.sendall('Asistente: acción cancelada.'.encode())
                                 continue
 
+                            # Entrada predeterminada para una nueva solicitud.
                             history = f'Creación de la solicitud por {executive.name}'
 
+                            # Se actualiza la cantidad de solicitudes existentes que hay, para asignar un número válido
+                            # y único a cada una.
                             with threading_lock:
                                 requests_number += 1
                                 _requests_number = requests_number
 
+                            # Se crea la solicitud
                             new_request = Solicitud(subject, True, [history], _requests_number)
 
+                            # Se envía, pregunta y recibe respuesta sobre si desea guardar la solicitud creada de ser la
+                            # respuesta 'si' se guarda, si no, se descarta.
                             exec_socket.sendall(f"Asistente: La solicitud ha sido creada. ¿Desea guardarla? [Y/n]\n"
                                                 f"\tSolicitud {_requests_number}\n"
                                                 f"\t Descripción: {subject}\n"
                                                 f"\t Historia: {history}\n"
                                                 f"\t Estado: abierta".encode())
+
                             response = exec_socket.recv(1024).decode()
 
                             if response.lower() in ('si', 'yes', 's', 'y', 'ye'):
@@ -183,6 +238,7 @@ def exec_loop(exec_connection: Conexion):
                                 exec_socket.sendall("Asistente: La solicitud fue guardada.".encode())
                             else:
                                 exec_socket.sendall("Asistente: La solicitud fue descartada.".encode())
+
                             del new_request
 
                         # -------------------------------------------------------------------------------------------- #
@@ -193,6 +249,8 @@ def exec_loop(exec_connection: Conexion):
                                 exec_socket.sendall(b'Asistente: No ha seleccionado una solicitud del cliente.')
 
                             else:
+                                # Se recibe la nueva descripción e imprime al ejecutivo si realmente se desea cambiar
+                                # de la antigua a la nueva.
                                 new_subject = data_received.lstrip(':subject').lstrip()
                                 old_subject = working_request.subject
 
@@ -204,6 +262,7 @@ def exec_loop(exec_connection: Conexion):
 
                                 data = exec_socket.recv(1024).decode()
 
+                                # De decidir el ejecutivo que se guarda, se guarda la nueva descripción
                                 if data.lower() in ('si', 'yes', 'y', 'ye', 's'):
                                     working_request.subject = new_subject
                                     exec_socket.sendall(
@@ -214,20 +273,25 @@ def exec_loop(exec_connection: Conexion):
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :state, cambia el estado de una solicitud escogida anteriormente
                         elif data_received[0:len(':state')] == ':state':
+
                             if working_request is None:
                                 exec_socket.sendall(b'Asistente: No ha seleccionado una solicitud del cliente.')
+
                             else:
+                                # Se identifica el nuevo estado de la solicitud dentro del mensaje
                                 new_state = data_received.lstrip(':state').lstrip()
                                 old_state = working_request.open
 
+                                # Se identifica según si está abierta (True) o cerrada (False)
                                 if new_state.lower() in ('abierto', 'open'):
                                     new_state = True
                                 elif new_state.lower() in ('cerrado', 'closed'):
                                     new_state = False
                                 else:
                                     exec_socket.sendall('Asistente: Opción invalida, operación cancelada.')
-                                    continue
+                                    continue  # De ser inválida la opción escogida, se cancela la operación.
 
+                                # Se envía información para confirmar el cambio que se desea hacer
                                 exec_socket.sendall(
                                     f"Asistente: Se va a cambiar el estado de la solicitud "
                                     f"{working_request.number}\n"
@@ -235,6 +299,7 @@ def exec_loop(exec_connection: Conexion):
                                     f"\tA: {'abierto' if new_state else 'cerrado'}\n"  # Estado nuevo
                                     f"¿Desea continuar? [Y/n]".encode())
 
+                                # Se recibe y lleva a cabo la opción escogida por el usuario
                                 data = exec_socket.recv(1024).decode()
 
                                 if data.lower() in ('si', 'yes', 'y', 'ye', 's'):
@@ -246,11 +311,14 @@ def exec_loop(exec_connection: Conexion):
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :history, agrega una nueva entrada a una solicitud escogida anteriormente
                         elif data_received[0:len(':history')] == ':history':
+
                             if working_request is None:
                                 exec_socket.sendall(b'Asistente: No ha seleccionado una solicitud del cliente.')
-                            else:
-                                new_history = data_received.lstrip(':history').lstrip()
 
+                            else:
+                                # Se recupera la historia a agregar de la información recibida
+                                new_history = data_received.lstrip(':history').lstrip()
+                                # Se confirma con el ejecutivo de la nueva entrada de historia a agregar
                                 exec_socket.sendall(
                                     f"Asistente: Se va a agregar la siguiente entrada a la historia de la solicitud "
                                     f"{working_request.number}:\n"
@@ -259,6 +327,7 @@ def exec_loop(exec_connection: Conexion):
 
                                 data = exec_socket.recv(1024).decode()
 
+                                # Si confirma la acción se agrega, si no, se cancela
                                 if data.lower() in ('si', 'yes', 'y', 'ye', 's'):
                                     working_request.history.append(new_history)
                                     exec_socket.sendall('Asistente: La entrada fue agregada.'.encode())
@@ -268,6 +337,7 @@ def exec_loop(exec_connection: Conexion):
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :restart, reinicia los servicios del modem del cliente
                         elif data_received[0:len(':restart')] == ':restart':
+                            # Se imprime y envía mensajes de que se reinició el modem del cliente
                             exec_socket.sendall(f'Asistente: Se reiniciaron los servicios de {client.name}.'.encode())
                             client_socket.sendall(f'Asistente: {executive.name} ha reiniciado su modem.'.encode())
                             print(f"[INFO] {executive.name} reinició los servicios de {client.name}.")
@@ -279,22 +349,30 @@ def exec_loop(exec_connection: Conexion):
 
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :help, imprime los comandos disponibles
-                        elif data_received[0:len(':help')] == ':help' or data_received[0:len(':name')] == ':name':
+                        elif data_received[0:len(':exit')] == ':exit' or data_received[0:len(':name')] == ':name':
                             exec_socket.sendall("Asistente: Comando no disponible al hablar con cliente.".encode())
 
+                        # -------------------------------------------------------------------------------------------- #
+                        # Opción :help, imprime los comandos disponibles
+                        elif data_received[0:len(':connect')] == ':connect':
+                            exec_socket.sendall(f"Asistente: Usted ya se encuentra conectade a un cliente".encode())
+
+                        # -------------------------------------------------------------------------------------------- #
+                        # En caso de no haber enviado un comando se reenvía el mensaje al cliente
                         else:
                             data_to_send = (executive.name + ': ' + data_received).encode()
                             client_socket.sendall(data_to_send)
 
+                    # Captura de posibles errores
                     except OSError:
                         break
 
-        # TODO: Implementar logica del ejecutivo (Hasta aqui funcionan todas)
-
-
-# client_loop: loop en donde se encuentran los usuarios correspondientes a clientes
-#
+# TODO: Comentado de aquí para abajo
+# FUNC: client_loop
+# DESC: loop en donde se encuentran los usuarios que corresponden a clientes. Implementa todas la funciones,
+#       comandos y lógicas realizables.
 # PARAMS:
+#   client_connection: objeto conexión con el usuario y socket del cliente
 def client_loop(client_connection: Conexion):
     client = client_connection.user
     client_socket = client_connection.socket
@@ -406,19 +484,14 @@ def client_loop(client_connection: Conexion):
         # disponibles.
         client_socket.sendall(f"\nAsistente: ¿De qué otra manera podemos ayudarle?\n{assistant_options}".encode())
 
-    # Fin del loop donde se encuentra el usuario, guardamos su información, donde se pudo haber cambiado el estado,
-    # o agregado una solicitud
-    with threading_lock:
-        old_user = list(filter(lambda x: x.rut == client.rut, clients))
-    if len(old_user) != 0:
-        with threading_lock:
-            clients.remove(old_user[0])
-            clients.append(client)
 
-
-# Función encargada de manejar las conexiones
-def connection_(a_socket):
-    user_connection = None
+# FUNC: _connection_manager
+# DESC: función encargada de autenticar al usuario, manejar que la conexión se mantenga/cierre y administrar la
+#       aparición de errores.
+# PARAMS:
+#   a_socket: objeto tipo socket del usuario a conectar
+def _connection_manager(a_socket):
+    user_connection = None  # Variable que guardará el objeto tipo Conexión del usuario
 
     try:
         with a_socket as user_socket:
@@ -430,26 +503,32 @@ def connection_(a_socket):
             # -------------------------------------------------------------------------------------------------------- #
             # Autenticación
             while True:
-                user_rut = user_socket.recv(2048).decode()
+                user_rut = user_socket.recv(2048).decode()  # Se recibe el RUT
 
                 # TODO: Implementar correctamente NLP / RUT
-                intencion = interpret_user_input(user_rut)
+                intencion = interpret_user_input(user_rut)  # Se interpreta el mensaje del usuario con NLP
 
+                # En caso de ser la intención del usuario despedirse, se cierra la conexión
                 if user_rut.lower() in ('4', 'chao', 'bye', 'no') or intencion == 'despedida':
                     print("[SERVER] Usuario no autenticado se desconectó.")
                     user_socket.close()
                     return
 
+                # Si la respuesta no es despedida se intenta autenticar al usuario
                 try:
                     with threading_lock:
+                        # Se busca al usuario entre clientes y ejecutivos, de no encontrarse se levanta 'IndexError'
                         user = list(filter(lambda x: x.rut == user_rut, clients + execs))[0]
+                        # Se busca si el usuario ya está conectado
                         matching_connections = list(filter(lambda x: user == x.user, connections))
 
+                    # Si el usuario ya está conectado, se informa y reinicia el proceso
                     if len(matching_connections) != 0:
                         user_socket.sendall(b'Asistente: Usuario ya se encuentra conectado.\n'
                                             b'Asistente: Si desea conectarse como otro usuario ingrese un nuevo rut\n'
                                             b'Asistente: Si desea desconectarse apriete 4 o despidase.')
                     else:
+                        # Se crea un objeto Conexión y se agrega a la lista de conexiones existentes
                         user_connection = Conexion(user, user_socket)
 
                         with threading_lock:
@@ -457,26 +536,31 @@ def connection_(a_socket):
                         break
 
                 except IndexError:
+                    # Se informa que el RUT es inválido
                     user_socket.sendall(b'Asistente: RUT invalido, vuelva a ingresar su RUT o despidase para salir.')
 
             # -------------------------------------------------------------------------------------------------------- #
             # Usuario ya se encuentra autenticado
             print(f"[SERVER] {user.name} se conectó.")
 
+            # -------------------------------------------------------------------------------------------------------- #
+            # Se inicia el proceso del usuario según si es ejecutivo o cliente
             if user.is_executive:
                 exec_loop(user_connection)  # Si es que es ejecutivo
             else:
                 client_loop(user_connection)  # Si es que es usuario
 
+    # Manejo de errores en caso de que se haya interrumpido la conexión
     except ConnectionResetError or BrokenPipeError as in_thread_error:
         print(f"[WARN::] {in_thread_error}")
 
+    # Se finaliza la sesión de usuario, informa en la consola y remueve la conexión de conexiones existentes
     finally:
         print(f"[SERVER] {user.name} se desconectó.")
         if user_connection is not None:
             connections.remove(user_connection)
 
-
+# TODO: limpiar esta parte
 # IF NAME == MAIN
 # Inicio del socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -491,7 +575,7 @@ try:
     while True:
         try:
             conn, addr = sock.accept()
-            new_t = threading.Thread(target=connection_, args=[conn])
+            new_t = threading.Thread(target=_connection_manager, args=[conn])
             new_t.start()
         except BrokenPipeError or ConnectionResetError as datos:  # Debug
             print(f"[WARN] Someone disconnected\n{datos}")
