@@ -7,6 +7,7 @@
 import socket
 import threading
 import json
+import sys
 from custom_classes import *
 
 # Variables para hacer setup del servidor, se usa localhost y el puerto 30000
@@ -16,7 +17,7 @@ PORT = 30001
 # True si se desea activar NLP, False si no se desea usar
 use_NLP = False
 if use_NLP:
-    print("[INFO] Cargando modelo")
+    print("[INFO] Cargando modelo...")
     from intencion import intencion  # Para usar NLP
 
 # Variables auxiliares a usar:
@@ -39,7 +40,6 @@ waiting_list = []
 # cerrarse.
 threading_lock = threading.Lock()
 close_thread = threading.Event()
-
 
 # Función que lee el archivo .json con los usuarios y crea un objeto _Usuario_ para cada uno
 # y luego lo agrega a la lista de usuarios. También devuelve la cantidad existente de solicitudes,
@@ -85,6 +85,7 @@ def exec_loop(exec_connection: Conexion):
 
     # Comandos disponibles para el ejecutivo
     commands = '\t:name <nombre> (cambia su nombre)\n' \
+               '\t:cname <nombre> (cambia nombre de cliente)*\n' \
                '\t:exit (termina conexión con el servidor)\n' \
                '\t:connect (conecta al ejecutivo a un cliente en la lista de espera)\n' \
                '\t:close (cierra la conexión con el cliente)*\n' \
@@ -95,30 +96,64 @@ def exec_loop(exec_connection: Conexion):
                '\t:history <new history> (agrega historia a la solicitud del cliente conectado)*\n' \
                '\t:restart (reinicia los servicios del cliente)*\n' \
                '\t:help (imprime la lista de comandos)\n' \
-               '* Es necesario estar conectade con un cliente.\n'
+               '* Es necesario estar conectade con un cliente.\n' \
+               '** No se deben agregar <> o [] al llamar a comandos con argumentos.\n'
 
     # Se envía una bienvenida al ejecutivo para señalar que se realizó la autenticación correctamente
     exec_socket.sendall(f'Asistente: Bienvenide {executive.name} los comandos disponibles son:\n{commands}'.encode())
 
     # Se inicia loop donde se encontrará el ejecutivo
+    _people_in_queue = 0
+    _passed_once_with_nd = False
     while True:
         working_request = None  # Variable donde se guarda la solicitud con la cual se trabajará
 
+        # Se revisa si la señal de cerrar los hilos se activó
+        if close_thread.is_set():
+            break
+
         # Se revisa si hay clientes esperando ser atendidos
         with threading_lock:
-            if len(waiting_list) != 0:
-                exec_socket.sendall(f"Asistente: Hay {len(waiting_list)} clientes en la lista de espera. "
-                                    f"Envíe :connect para conectarse con el primero en la fila.".encode())
+            _old_number = _people_in_queue
+            _people_in_queue = len(waiting_list)
+
+        if _people_in_queue != 0 and not _passed_once_with_nd:
+            exec_socket.sendall(f"Asistente: Hay {_people_in_queue} clientes en la lista de espera. "
+                                f"Envíe :connect para conectarse con el primero en la fila.".encode())
+        elif _old_number != _people_in_queue and _passed_once_with_nd:
+            exec_socket.sendall(f"Asistente: Hay {_people_in_queue} clientes en la lista de espera. "
+                                f"Envíe :connect para conectarse con el primero en la fila.".encode())
 
         # Se recibe información del ejecutivo y se decodifica.
         # Si es un comando, se ejecuta, si no, se reenvía al usuario
-        data = exec_socket.recv(1024).decode()
+        try:
+            exec_socket.setblocking(False)
+            data = exec_socket.recv(1024).decode()
+        except BlockingIOError:
+            data = '<NO//DATA>'
+        finally:
+            exec_socket.setblocking(True)
+
+        if data == '<NO//DATA>':
+            _passed_once_with_nd = True
+        else:
+            _passed_once_with_nd = False
+
+        # Se revisa si la señal de cerrar los hilos se activó
+        if close_thread.is_set():
+            break
 
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción :name, cambia el nombre del ejecutivo al cual se desee
         if data[0:len(':name')] == ':name':
             old_name = executive.name  # Nombre antiguo
-            executive.name = data.lstrip(':name').lstrip()  # Se rescata el nuevo nombre
+            new_name = data.lstrip(':name').lstrip()  # Se rescata el nuevo nombre
+
+            if new_name.rstrip() == '':
+                exec_socket.sendall('Asistente: Nombre inválido, no fue cambiado'.encode())
+                continue
+            
+            executive.name = new_name
             exec_socket.sendall(f"Asistente: Su nombre fue cambiado a {executive.name}".encode())  # Aviso del cambio
             print(f"[INFO] Ejecutive {old_name} cambió su nombre a {executive.name}")  # Se imprime que hubo un cambio
 
@@ -168,9 +203,24 @@ def exec_loop(exec_connection: Conexion):
                         # Se recibe información del ejecutivo
                         data_received = exec_socket.recv(1024).decode()
 
+                        # ------------------------------------------------------------------------------------------------------------ #
+                        # Opción :namec, cambia el nombre del cliente al cual se desee
+                        if data_received[0:len(':cname')] == ':cname':
+                            old_name = client.name  # Nombre antiguo
+                            new_name = data_received.lstrip(':cname').lstrip()  # Se rescata el nuevo nombre
+
+                            if new_name.rstrip() == '':
+                                exec_socket.sendall('Asistente: Nombre inválido, no fue cambiado'.encode())
+                                continue
+                            
+                            client.name = new_name
+                            exec_socket.sendall(f"Asistente: El nombre fue cambiado a {client.name}".encode())  # Aviso del cambio
+                            client_socket.sendall(f"Asistente: Su nombre fue cambiado a {client.name}".encode())  # Aviso del cambio
+                            print(f"[INFO] Ejecutive {executive.name} cambió el nombre de {old_name} a {new_name}")  # Se imprime que hubo un cambio
+
                         # -------------------------------------------------------------------------------------------- #
                         # Opción :close, termina el chat con un cliente
-                        if data_received == '' or data_received[0:len(':close')] == ':close':
+                        elif data_received == '' or data_received[0:len(':close')] == ':close':
                             client_socket.sendall("Asistente: Ejecutive se ha desconectado.".encode())
                             exec_socket.sendall("Asistente: Conexion con el cliente terminada".encode())
                             # Bandera que avisa al cliente del cierre de conexión entre ejecutivo y cliente
@@ -304,7 +354,7 @@ def exec_loop(exec_connection: Conexion):
                                 elif new_state.lower() in ('cerrado', 'closed'):
                                     new_state = False
                                 else:
-                                    exec_socket.sendall('Asistente: Opción invalida, operación cancelada.')
+                                    exec_socket.sendall('Asistente: Opción invalida, operación cancelada.'.encode())
                                     continue  # De ser inválida la opción escogida, se cancela la operación.
 
                                 # Se envía información para confirmar el cambio que se desea hacer
@@ -403,22 +453,28 @@ def client_loop(client_connection: Conexion):
     client_socket.sendall(f"Bienvenido {client.name}, en que podemos ayudarle?\n{assistant_options}".encode())
 
     # Loop del cliente
+    _passed_once_with_nd = False
     while True:
         # Se revisa si la señal de cerrar los hilos se activó
         if close_thread.is_set():
             break
-
-        data = client_socket.recv(1024).decode()  # Recibir la información del cliente
-
-        # Se revisa nuevamente si la señal de cerrar los hilos se activó
-        if close_thread.is_set():
-            break
+        
+        try:
+            client_socket.setblocking(False)
+            data = client_socket.recv(1024).decode()  # Recibir la información del cliente
+        except BlockingIOError:
+            data = '<NO//DATA>'
+        finally:
+            client_socket.setblocking(True)
 
         # En caso de que no llegué información del cliente se reinicia el loop
-        if not data:
+        if not data or data == '<NO//DATA>':
             continue
 
         intencion = interpret_user_input(data)  # Interpretación del mensaje del cliente por NLP
+
+        if data in ('1', '2', '3', '4'):
+            intencion = ''
 
         # Inicio de interpretación de la información recibida del cliente
         # ------------------------------------------------------------------------------------------------------------ #
@@ -486,8 +542,14 @@ def client_loop(client_connection: Conexion):
             # el cliente no posee comandos, solo envía mensajes a ejecutivo
             while True:
                 try:
-                    data_received = client_socket.recv(1024).decode()  # Información recibida
-                    data_to_send = (client.name + ': ' + data_received).encode()  # Información limpiada para enviar
+                    try:
+                        client_socket.setblocking(False)
+                        data_received = client_socket.recv(1024).decode()  # Información recibida
+                        data_to_send = (client.name + ': ' + data_received).encode()  # Información limpiada para enviar
+                    except BlockingIOError:
+                        data_received = '<NO//DATA>'
+                    finally:
+                        client_socket.setblocking(True)
 
                     # Se revisa si se activó la bandera para cerrar conexión cliente-ejecutivo
                     if data_received == '' or client_connection.reset_connection:
@@ -495,6 +557,8 @@ def client_loop(client_connection: Conexion):
                         client_connection.exec_info = None
                         client_connection.reset_connection = False
                         break
+                    elif data_received == '<NO//DATA>':
+                        continue
 
                     exec_socket.sendall(data_to_send)  # Envío de información
 
@@ -602,6 +666,7 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((HOST, PORT))
     sock.listen()
+    sock.settimeout(0.5)
 
     # Imprimos que el servidor inició e información de estado
     print(f"[INFO] Server started on {HOST}:{PORT}\n"
@@ -609,7 +674,6 @@ if __name__ == '__main__':
     # Procesamos a los usuarios y asignamos a requests_number el número total de solicitudes existentes
     requests_number = process_users()
 
-    # Iniciamos un loop donde aceptamos las conexiones entrantes y creamos un hilo para cada una
     try:
         while True:
             try:
@@ -618,6 +682,9 @@ if __name__ == '__main__':
                 new_t.start()
             except BrokenPipeError or ConnectionResetError as datos:  # Manejo de errores
                 print(f"[WARN] Someone disconnected\n{datos}")
+
+            except socket.timeout:
+                continue
 
     except KeyboardInterrupt:  # En caso de apretar Ctrl-C se guarda la data
         print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
