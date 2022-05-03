@@ -11,7 +11,7 @@
    },
    {
       "tag":"despedida", 
-      "input":["bye","chaito","chau","chao","hasta pronto","hasta luego", "adios", "nos vemos", "buenas noches", "gracias por su servicio","muchas gracias por su servicio"],
+      "input":["bye","chaito","chau","chao","hasta pronto","hasta luego", "adios", "nos vemos", "buenas noches", "gracias por su servicio","muchas gracias por su servicio", "exit", "cerrar", "desconectar", "desconectarse"],
       "responses":[
         "Hasta luego, que tenga un buen día", 
         "Hasta luego, espero haber sido de ayuda", 
@@ -38,7 +38,16 @@
    },
   {
       "tag":"reiniciar_servicios", 
-      "input":["quiero reiniciar mi servicio","reinicio de servicio","quiero reiniciar el servicio","ayuda con el servicio"],
+      "input":["quiero reiniciar mi servicio",
+        "reinicio de servicio",
+        "quiero reiniciar el servicio",
+        "ayuda con el servicio",
+        "servicio",
+        "service",
+        "modem",
+        "router",
+        "reiniciar",
+        "necesito reiniciar"],
       "responses":[
         "Perfecto, reiniciaremos su servicio", 
         "Muy bien, reiniciaremos su servicio" 
@@ -46,7 +55,21 @@
    },
   {
       "tag":"ejecutivo", 
-      "input":["ejecutivo","ayuda con el ejecutivo","ejecutivos","quiero hablar con un ejecutivo","hablare con un ejecutivo","quiero al ejecutivo"],
+      "input":["ejecutivo",
+        "ayuda con el ejecutivo",
+        "ejecutivos",
+        "quiero hablar con un ejecutivo",
+        "hablare con un ejecutivo",
+        "quiero al ejecutivo",
+        "hablar ejecutivo",
+        "quiero persona",
+        "persona",
+        "necesito una persona",
+        "ejecutiva",
+        "ejecutive",
+        "exec",
+        "ejecutiv",
+        "ejecuti"],
       "responses":[
         "Okay, lo redirigiremos a un ejecutivo de inmediato", 
         "Perfecto, será reenviado a un ejecutivo enseguida" 
@@ -54,7 +77,7 @@
    },
    {
       "tag":"historial", 
-      "input":["historial","sesiones anteriores","solicitudes","solicitudes anteriores","quiero ver mi historial","revisar historial","revisar atenciones anteriores","sesiones anteriores"],
+      "input":["historial","sesiones anteriores","solicitudes","solicitudes anteriores","quiero ver mi historial","revisar historial","revisar atenciones anteriores","sesiones","ultima actualizacion","en que va","history","solicitud"],
       "responses":[
         "Estas fueron sus solicitudes anteriores", 
         "Aqui estan sus solicitudes anteriores" 

@@ -1,3 +1,9 @@
+# server.py
+# Archivo donde se encuentra el código del servidor
+# Versión: Python 3.10
+# Agustín González y Benjamín Castro
+# otoño 2022 - Principios de Comunicaciones - Proyecto 1
+
 import socket
 import threading
 import json
@@ -6,6 +12,12 @@ from custom_classes import *
 # Variables para hacer setup del servidor, se usa localhost y el puerto 30000
 HOST = "127.0.0.1"
 PORT = 30001
+
+# True si se desea activar NLP, False si no se desea usar
+use_NLP = False
+if use_NLP:
+    print("[INFO] Cargando modelo")
+    from intencion import intencion  # Para usar NLP
 
 # Variables auxiliares a usar:
 # Lista con las conexiones actuales al servidor, de tipo _Conexion_
@@ -50,9 +62,13 @@ def process_users():
     return number_of_requests  # Se devuelve la cantidad de solicitudes existentes
 
 
-# Interpreta el mensaje del usuario y entrega su intención (uso de NLP)
-def interpret_user_input(user_msg):
-    return 0
+# Interpreta el mensaje del usuario y entrega su intención (uso de NLP), según si se activó o no se usa.
+if use_NLP:
+    def interpret_user_input(user_msg):
+        return intencion(user_msg)
+else:
+    def interpret_user_input(user_msg):
+        return None
 
 
 # FUNC: exec_loop
@@ -140,7 +156,7 @@ def exec_loop(exec_connection: Conexion):
                 client_socket = client_connection.socket
                 # Se avisa de la conexión
                 exec_socket.sendall(f'Asistente: Conectandole con {client.name}...'
-                                    f'\nYo: Hola soy {executive.name}, ¿en qué le puedo ayudar?'.encode())
+                                    f'\nYo: Hola {client.name}, ¿en qué le puedo ayudar?'.encode())
 
                 # Loop en que se encuentra el ejecutivo cuando está conectado con un cliente.
                 # Activa/desactiva ciertos comandos.
@@ -445,14 +461,19 @@ def client_loop(client_connection: Conexion):
                 queue_number = len(waiting_list)
 
             # Se avisa que número en la fila tiene el cliente
-            client_socket.sendall(f'Asistente: Usted se encuentra número {queue_number} en la fila, '
-                                  f'por favor espere...'.encode())
+            client_socket.sendall(
+                f'Asistente: Usted se encuentra número {queue_number} en la fila, por favor espere...'.encode())
 
             # Se revisa si es que ya se asignó un ejecutivo al cliente, se mantiene al cliente en un loop
             while True:
                 with threading_lock:
                     if client_connection.exec_info is not None:
                         break
+                    current_pos = waiting_list.index(client_connection) + 1
+                if current_pos < queue_number:
+                    client_socket.sendall(
+                        f'Asistente: Usted se encuentra número {current_pos} en la fila, por favor espere...'.encode())
+                    queue_number = current_pos
 
             # El ejecutivo ya se conectó y se identifica su socket y usuario
             executive = client_connection.exec_info.user
@@ -493,7 +514,7 @@ def client_loop(client_connection: Conexion):
         # ------------------------------------------------------------------------------------------------------------ #
         # Opción despedida
         # Descripción: Cierra la conexión del cliente con el servidor
-        if data == "4" or intencion == 'despedida':
+        if data in ("4", ":exit") or intencion == 'despedida':
             break
 
         # Cada vez que se termina una acción solicitada por el usuario el servidor envía el mensaje de las opciones
@@ -582,20 +603,23 @@ if __name__ == '__main__':
     sock.bind((HOST, PORT))
     sock.listen()
 
-    print(f"[INFO] Server started on {HOST}:{PORT}")  # Imprimos que el servidor inició
+    # Imprimos que el servidor inició e información de estado
+    print(f"[INFO] Server started on {HOST}:{PORT}\n"
+          f"[INFO] NLP se encuentra {'ACTIVADO' if use_NLP else 'DESACTIVADO'}")
     # Procesamos a los usuarios y asignamos a requests_number el número total de solicitudes existentes
     requests_number = process_users()
 
+    # Iniciamos un loop donde aceptamos las conexiones entrantes y creamos un hilo para cada una
     try:
         while True:
             try:
                 conn, addr = sock.accept()
                 new_t = threading.Thread(target=_connection_manager, args=[conn])
                 new_t.start()
-            except BrokenPipeError or ConnectionResetError as datos:  # Debug
+            except BrokenPipeError or ConnectionResetError as datos:  # Manejo de errores
                 print(f"[WARN] Someone disconnected\n{datos}")
 
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:  # En caso de apretar Ctrl-C se guarda la data
         print(f"[INFO] Server interrupted with Ctrl-C, closing everything...")
         close_thread.set()
 
@@ -606,18 +630,19 @@ if __name__ == '__main__':
             if len(connections) == 0:
                 break
 
-    except Exception as error:
+    except Exception as error:  # En caso de un error inesperado
         print(f"[WARN:] {error}")
 
-    finally:
+    finally:  # Se cierra el socket del servidor
 
         sock.close()
 
+        # Se guarda la información de usuarios y ejecutivos
         with open('users.json', 'w') as file:
             user_data = [u.to_json() for u in clients]
             exec_data = [e.to_json() for e in execs]
             json.dump(exec_data + user_data, file, indent=4, separators=(',', ': '))
 
+        # Se informa de que se cerró el server y que se guardó la información de usuarios
         print("[INFO] Saved user data.")
-
         print("\b\b[INFO] Server closed.")
