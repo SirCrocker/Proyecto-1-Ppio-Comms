@@ -8,6 +8,14 @@ import socket
 import sys
 import threading
 
+if sys.platform in ('win32', 'win', 'cygwin', 'msys'):
+    def _remove_cmdline_entry(msg_sent):
+        print('\b\r' + " " * len(msg_sent), end='\r')
+
+else: #  sys.platform in ('darwin', 'linux') y otros OS-ses 
+    def _remove_cmdline_entry(_):
+        print('\b\033[1A' + '\033[K', end="\r")
+
 def main():
 
     # Prefijo/nombre que se imprimirá en la consola del cliente (en vez de su nombre)
@@ -46,7 +54,8 @@ def main():
     try:
         for user_message in sys.stdin:
             clean_msg = user_message.rstrip()
-            print('\b\033[1A' + '\033[K', end="\r")  # Esto borra el mensaje anterior para imprimirlo con 'Yo: {data}'
+            _remove_cmdline_entry(user_message)  # Esto borra el mensaje anterior para imprimirlo con 'Yo: {data}'
+            _remove_cmdline_entry(user_message)
 
             if clean_msg == '':  # Si el mensaje está en blanco no se hace nada
                 continue
@@ -58,11 +67,12 @@ def main():
 
             if clean_msg == "4" or not listener.is_alive():  # Si el hilo murió o si se envía 4, se cierra el socket
                 connection_ended = True
-                print('\b\033[1A' + '\033[K', end="\r")
+                _remove_cmdline_entry(user_message)
                 break
 
     except KeyboardInterrupt:
         connection_ended = True  # Para avisarle al hilo que se cerró la conexión
+    
     finally:
         sock.close()  # Se cierra el socket
 
