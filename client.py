@@ -9,17 +9,17 @@ import sys
 import threading
 
 # Se revisa el sistema operativo donde se está corriendo el script para definir
-# para definir una manera de borrar entradas a sys.stdin, no funciona en Windows
+# una manera de borrar entradas a sys.stdin, no funciona en Windows
 if sys.platform in ('win32', 'win', 'cygwin', 'msys'):
-    def _remove_cmdline_entry(msg_sent):
-        print('\b\r' + " " * len(msg_sent), end='\r')
+    def _remove_cmdline_entry(_):
+        pass
 
-else: #  sys.platform in ('darwin', 'linux') y otros OS-ses 
+else:  # sys.platform in ('darwin', 'linux') y otros OS-ses
     def _remove_cmdline_entry(_):
         print('\b\033[1A' + '\033[K', end="\r")
 
-def main():
 
+def main():
     # Prefijo/nombre que se imprimirá en la consola del cliente (en vez de su nombre)
     user_prefix = "Yo"
     connection_ended = False  # Para establecer que se cerró la conexión
@@ -67,16 +67,18 @@ def main():
             if clean_msg != "":
                 sock.sendall(clean_msg.encode())  # Si el mensaje no está vacío, se envía
 
-            if clean_msg in ("4", ":exit") or not listener.is_alive():  # Si el hilo murió o si se envía 4, se cierra el socket
+            if clean_msg in (
+            "4", ":exit") or not listener.is_alive():  # Si el hilo murió o si se envía 4, se cierra el socket
                 connection_ended = True
                 _remove_cmdline_entry(user_message)
                 break
 
     except KeyboardInterrupt:
         connection_ended = True  # Para avisarle al hilo que se cerró la conexión
-    
+
     finally:
         sock.close()  # Se cierra el socket
+
 
 # Se corre la función principal e imprimen mensajes de despedida al salir
 if __name__ == '__main__':
