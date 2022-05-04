@@ -15,7 +15,7 @@ HOST = "127.0.0.1"
 PORT = 30001
 
 # True si se desea activar NLP, False si no se desea usar
-use_NLP = False
+use_NLP = True
 if use_NLP:
     print("[INFO] Cargando modelo...")
     from intencion import intencion  # Para usar NLP
@@ -125,7 +125,15 @@ def exec_loop(exec_connection: Conexion):
                                 f"Envíe :connect para conectarse con el primero en la fila.".encode())
 
         # Se recibe información del ejecutivo y se decodifica.
+<<<<<<< Updated upstream
         # Si es un comando, se ejecuta, si no, se reenvía al usuario
+=======
+        # Se pone al socket en modo 'no bloquear', donde si no hay información que leer levanta el error 'BlockingIOError'
+        # de levantarse la información 'recibida' pasa a ser '<NO//DATA>' y reinicia el loop, el finally se encarga de volver
+        # a poner al socket en modo 'bloqueado' para futuros usos
+        #
+        # Si es que hay información y es un comando, se ejecuta, si no, se reenvía al usuario
+>>>>>>> Stashed changes
         try:
             exec_socket.setblocking(False)
             data = exec_socket.recv(1024).decode()
@@ -134,6 +142,11 @@ def exec_loop(exec_connection: Conexion):
         finally:
             exec_socket.setblocking(True)
 
+<<<<<<< Updated upstream
+=======
+        # Si no se recibió información del ejecutivo, se establece la variable '_passed_once_with_nd' True para simbolizar este
+        # suceso
+>>>>>>> Stashed changes
         if data == '<NO//DATA>':
             _passed_once_with_nd = True
         else:
@@ -149,6 +162,10 @@ def exec_loop(exec_connection: Conexion):
             old_name = executive.name  # Nombre antiguo
             new_name = data.lstrip(':name').lstrip()  # Se rescata el nuevo nombre
 
+<<<<<<< Updated upstream
+=======
+            # Si el nombre es vacío se envía que es inválido
+>>>>>>> Stashed changes
             if new_name.rstrip() == '':
                 exec_socket.sendall('Asistente: Nombre inválido, no fue cambiado'.encode())
                 continue
@@ -172,7 +189,7 @@ def exec_loop(exec_connection: Conexion):
         # Opción :connect, conecta al ejecutivo con un cliente, de haber clientes en la fila de espera
         elif data[0:len(':connect')] == ':connect':
 
-            # Se revisa si hay clientes en la lista de espera, de haber se conecta, si no se dice que no hay
+            # Se revisa si hay clientes en la lista de espera, de haber se conecta, si no, se dice que no hay
             with threading_lock:
                 clients_waiting = len(waiting_list)
 
@@ -197,14 +214,18 @@ def exec_loop(exec_connection: Conexion):
                 # Activa/desactiva ciertos comandos.
                 while True:
 
-                    # Para manejo de posibles errores que pueden aparecer
+                    # Para manejo de posibles errores que puedan aparecer
                     try:
 
                         # Se recibe información del ejecutivo
                         data_received = exec_socket.recv(1024).decode()
 
                         # ------------------------------------------------------------------------------------------------------------ #
+<<<<<<< Updated upstream
                         # Opción :namec, cambia el nombre del cliente al cual se desee
+=======
+                        # Opción :cname, cambia el nombre del cliente al cual se desee
+>>>>>>> Stashed changes
                         if data_received[0:len(':cname')] == ':cname':
                             old_name = client.name  # Nombre antiguo
                             new_name = data_received.lstrip(':cname').lstrip()  # Se rescata el nuevo nombre
@@ -467,7 +488,11 @@ def client_loop(client_connection: Conexion):
         finally:
             client_socket.setblocking(True)
 
+<<<<<<< Updated upstream
         # En caso de que no llegué información del cliente se reinicia el loop
+=======
+        # En caso de que no llegue información del cliente se reinicia el loop
+>>>>>>> Stashed changes
         if not data or data == '<NO//DATA>':
             continue
 
@@ -579,6 +604,7 @@ def client_loop(client_connection: Conexion):
         # Opción despedida
         # Descripción: Cierra la conexión del cliente con el servidor
         if data in ("4", ":exit") or intencion == 'despedida':
+            client_socket.sendall(b'<EXIT//CMD>')
             break
 
         # Cada vez que se termina una acción solicitada por el usuario el servidor envía el mensaje de las opciones
@@ -666,20 +692,29 @@ if __name__ == '__main__':
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((HOST, PORT))
     sock.listen()
+<<<<<<< Updated upstream
     sock.settimeout(0.5)
+=======
+    sock.settimeout(0.5)  # Se establece un 'timeout' para que el socket del server no bloquee y se pueda llamar Ctrl-C
+>>>>>>> Stashed changes
 
     # Imprimos que el servidor inició e información de estado
-    print(f"[INFO] Server started on {HOST}:{PORT}\n"
+    print(f"[INFO] Server started on {HOST}:{PORT} (Press Ctrl-C to exit)\n"
           f"[INFO] NLP se encuentra {'ACTIVADO' if use_NLP else 'DESACTIVADO'}")
     # Procesamos a los usuarios y asignamos a requests_number el número total de solicitudes existentes
     requests_number = process_users()
 
+<<<<<<< Updated upstream
+=======
+    # Se empiezan a aceptar conexiones y manejan los posibles errores. Cada conexión tiene un hilo propio
+>>>>>>> Stashed changes
     try:
         while True:
             try:
                 conn, addr = sock.accept()
                 new_t = threading.Thread(target=_connection_manager, args=[conn])
                 new_t.start()
+
             except BrokenPipeError or ConnectionResetError as datos:  # Manejo de errores
                 print(f"[WARN] Someone disconnected\n{datos}")
 

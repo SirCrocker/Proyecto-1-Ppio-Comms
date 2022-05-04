@@ -25,6 +25,7 @@ Integrantes:
 *   Benjamín Castro
 """
 
+# Se importan las librerias necesarias para correr el modelo
 import numpy as np
 import string
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -33,90 +34,98 @@ from sklearn.preprocessing import LabelEncoder
 from keras.models import load_model
 import pandas as pd
 import json
+import warnings
 
+# Se declaran las variables globales correspondientes a la importación del modelo
 tags = []
 inputs = []
 responses = {}
 
-#Se carga el archivo dataset
+#Se ignoran los mensajes de advertencia de la librería TensorFlow 
+warnings.filterwarnings('ignore')
+
+# Se carga el archivo dataset con las intenciones y respuestas
 with open("modelo.json") as content:
   data1 = json.load(content)
 
-#La funcion carga el modelo desde la carpeta 'saved_model/my_model'
+# La funcion carga el modelo desde la carpeta 'saved_model/my_model'
 def cargar_modelo():
   m=load_model('saved_model/my_model')
   return m
 
-#Se deja el modelo guardado en la variable m
+# Se deja el modelo guardado en la variable m
 m=cargar_modelo()
 
-#Se carga el dataset pasando su contenido a una lista
+# Se carga el dataset pasando su contenido a una lista
 def cargar_dataset():
   global tags
   global inputs
   global responses
   global data1
-  #Se llenan los diccionarios a traves de un ciclo for
+  # Se llenan los diccionarios a traves de un ciclo for
   for intent in data1["intents"]:
-    #Se pasan las respuestas del chatbot a la lista
+    # Se pasan las respuestas del chatbot a la lista responses
     responses[intent['tag']]=intent['responses']
     for lines in intent['input']:
-      #Se importan las palabras de input y las etiquetas de los mensajes
+      # Se importan las palabras de input y las etiquetas de los mensajes
       inputs.append(lines)
       tags.append(intent['tag'])
-      data = pd.DataFrame({"inputs":inputs,"tags":tags})
+      data = pd.DataFrame({"inputs":inputs,"tags":tags}) # Se crea el dataframe con la librería Pandas
   return data
 
-#Se define el estimador como variable
+# Se define el estimador de entrenamiento como variable
 le=LabelEncoder()
-#El dataframe creado anteriormente se deja como variable
+
+# El dataframe creado anteriormente se deja como variable
 data=cargar_dataset()
-#Se crea el codificador de palabras
+
+# Se crea el codificador de palabras
 tokenizer = Tokenizer(num_words=2000)
 
-#Se ajusta el estimador a las dimensiones del dataset
+# Se ajusta el estimador a las dimensiones del dataset
 y_train = le.fit_transform(data['tags'])
 
 
-#Se entrena el modelo con la funcion entrenamiento
-#y se retornan los parametros de conjunto de entrenamiento, codificador, estimador
+# Se entrena el modelo con la función entrenamiento
+# y se retornan los parametros de conjunto de entrenamiento, codificador, estimador
 def entrenamiento():
-  #Se toman las variables globales que se utilizaran en la funcion
+  # Se toman las variables globales que se utilizaran en la función
   global le
   global data
   global m
   global tokenizer
   tokenizer.fit_on_texts(data['inputs'])
   train = tokenizer.texts_to_sequences(data['inputs'])
-  #Se crea una secuencia de bytes para que sean procesados por la red neuronal
+  # Se crea una secuencia de bytes para que sean procesados por la red neuronal
   x_train = pad_sequences(train)
-  input_shape = x_train.shape[1]
-  return tokenizer,train,x_train,input_shape,le
-
-#La variable input_shape considera las dimensiones del mensaje entregado
-#por el potencial usuario
+  input_shape = x_train.shape[1] # Se definen las dimensiones del mensaje de entrada
+  return tokenizer,train,x_train,input_shape,le # Se retorna una lista con las variables que usa intencion()
+ 
+# La variable input_shape considera las dimensiones del mensaje entregado
+# por el potencial usuario
 input_shape = entrenamiento()[3]
 
-#La funcion intencion toma un string que corresponde al mensaje entregado
-#por el usuario y devuelve un string con la intencion que estima el modelo
+# La función intencion toma un string que corresponde al mensaje entregado
+# por el usuario y devuelve un string con la intención que estima el modelo
 def intencion(input):
+  # Se toman las variables globales creadas anteriormente
   global m
   global tokenizer
   global input_shape
   texts_p = []
-  #remueve la puntuacion y convierte todo a minuscula
+  # Remueve la puntuacion y convierte todo a minuscula
   input = [letters.lower() for letters in input if letters not in string.punctuation]
   input = ''.join(input)
   texts_p.append(input)
-  #se asigna un codigo al input y se realiza el padding
+  # Se asigna un código al input y se realiza el padding (creación de secuencia de bytes para ingresarlos a la red neuronal)
   input = tokenizer.texts_to_sequences(texts_p)
   input = np.array(input).reshape(-1)
   input = pad_sequences([input],input_shape)
-  #se obtiene el output del modelo con la prediccion de este segun el input
+  # Se obtiene el output del modelo con la predicción de este segun el input
   output = m.predict(input)
-  #la prediccion con mayor probabilidad se rescata
+  # La predicción con mayor probabilidad se rescata
   output = output.argmax()
-  #el estimador obtiene la transformada inversa de dicha prediccion
-  #para pasarla a string
+  # El estimador obtiene la transformada inversa de dicha predicción
+  # para pasarla a string
   response_tag = le.inverse_transform([output])[0]
   return response_tag

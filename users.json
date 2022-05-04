@@ -7,7 +7,7 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Usuario de prueba 1 (ejecutivo)",
+        "name": "Benja",
         "rut": "2",
         "is_executive": true,
         "solicitudes_activas": [],
@@ -67,7 +67,7 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Cliente 3 (UdP)",
+        "name": "Juan",
         "rut": "5",
         "is_executive": false,
         "solicitudes_activas": [
@@ -115,7 +115,7 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Cliente 1 (UdP)",
+        "name": "carlitos",
         "rut": "1",
         "is_executive": false,
         "solicitudes_activas": [
@@ -134,7 +134,8 @@
                 "history": [
                     "Soy historia 2",
                     "Soy historia 2.1",
-                    "Descripci\u00f3n cambiada por Test User"
+                    "Descripci\u00f3n cambiada por Test User",
+                    ""
                 ]
             },
             {
