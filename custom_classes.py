@@ -6,7 +6,7 @@
 
 class Solicitud:
     """
-    Maneja las solicitudes, dandoles una descripcion (subject), un estado que simboliza si esta abierta o cerrada (open)
+    Maneja las solicitudes, dándoles una descripción (subject), un estado que simboliza si está abierta o cerrada (open)
     una historia (history) y un número identificador (number)
 
     El método to_json transforma la información almacenada en un diccionario en tipo json para luego poder ser guardado
@@ -32,12 +32,12 @@ class Solicitud:
 
 class Usuario:
     """
-    Maneja a los usuarios, teniendo como atributos su nombre (name), su rut (rut), si es que el usuario es un ejecutivo
+    Maneja a los usuarios, teniendo como atributos su nombre (name), su RUT (rut), si es que el usuario es un ejecutivo
     (is_executive), las solicitudes activas que tiene (solicitudes_activas) y las solicitudes inactivas que tiene
     (solicitudes_inactivas).
 
     El método to_json transforma la información almacenada en un diccionario en tipo json para luego poder ser guardado
-    un .json con toda la información correspondiente, donde ademas llama a ese método en sus solicitudes activas e
+    un .json con toda la información correspondiente, donde además llama a ese método en sus solicitudes activas e
     inactivas. De guardarse información de usuario se hace con el método del usuario.
     """
 
@@ -64,9 +64,10 @@ class Usuario:
 
 class Conexion:
     """
-    Maneja las conexiones existentes, teniendo tres atributos, _exec_conn_ que posee la conexion de un ejecutivo si es
-    que el usuario es cliente, _user_ que es el usuario conectado con esa ip y puerto, y _socket_ que es la instancia
-    de socket que posee toda la información correspondiente al socket de ese usuario en específico.
+    Maneja las conexiones existentes, teniendo tres atributos, _exec_conn_ que posee la conexión de un ejecutivo si es
+    que el usuario es cliente, _user_ que es el usuario conectado con esa ip y puerto,  _socket_ que es la instancia
+    de socket que posee toda la información correspondiente al socket de ese usuario en específico y _reset_connection
+    que es una bandera para comunicación binaria entre ejecutivo y cliente.
     """
 
     def __init__(self, user, socket_connection, exec_connection=None):
