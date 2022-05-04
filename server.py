@@ -379,7 +379,12 @@ def exec_loop(exec_connection: Conexion):
                                 data = exec_socket.recv(1024).decode()
 
                                 if data.lower() in ('si', 'yes', 'y', 'ye', 's'):
-                                    working_request.state = new_state
+                                    working_request.open = new_state
+
+                                    if not working_request.open:
+                                        client.solicitudes_activas.remove(working_request)
+                                        client.solicitudes_inactivas.append(working_request)
+
                                     exec_socket.sendall('Asistente: El estado de la solicitud fue cambiada.'.encode())
                                 else:
                                     exec_socket.sendall('Asistente: Se ha cancelado el cambio de estado.'.encode())
