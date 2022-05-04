@@ -7,7 +7,7 @@
         "solicitudes_inactivas": []
     },
     {
-        "name": "Benja",
+        "name": "Benjam\u00edn",
         "rut": "2",
         "is_executive": true,
         "solicitudes_activas": [],
@@ -94,28 +94,11 @@
         "name": "Cliente 2 (UdP)",
         "rut": "3",
         "is_executive": false,
-        "solicitudes_activas": [
-            {
-                "number": 1,
-                "subject": "Ayuda con Wifi, anda malo",
-                "open": true,
-                "history": [
-                    "Tecnico enviado a revisar la situacion"
-                ]
-            },
-            {
-                "number": 9,
-                "subject": "Recuperaci\u00f3n de contrase\u00f1a",
-                "open": true,
-                "history": [
-                    "Creaci\u00f3n de la solicitud por Juanin Juan Harry"
-                ]
-            }
-        ],
+        "solicitudes_activas": [],
         "solicitudes_inactivas": []
     },
     {
-        "name": "carlitos",
+        "name": "Carlos (Cliente)",
         "rut": "1",
         "is_executive": false,
         "solicitudes_activas": [

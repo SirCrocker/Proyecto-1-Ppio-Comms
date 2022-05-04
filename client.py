@@ -8,11 +8,8 @@ import socket
 import sys
 import threading
 
-<<<<<<< Updated upstream
-=======
 # Se revisa el sistema operativo donde se está corriendo el script para definir
 # para definir una manera de borrar entradas a sys.stdin, no funciona en Windows
->>>>>>> Stashed changes
 if sys.platform in ('win32', 'win', 'cygwin', 'msys'):
     def _remove_cmdline_entry(msg_sent):
         print('\b\r' + " " * len(msg_sent), end='\r')
@@ -61,10 +58,6 @@ def main():
         for user_message in sys.stdin:
             clean_msg = user_message.rstrip()
             _remove_cmdline_entry(user_message)  # Esto borra el mensaje anterior para imprimirlo con 'Yo: {data}'
-<<<<<<< Updated upstream
-            _remove_cmdline_entry(user_message)
-=======
->>>>>>> Stashed changes
 
             if clean_msg == '':  # Si el mensaje está en blanco no se hace nada
                 continue
